@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <sstream>
 
-ControlDot::ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* params)
+/*ControlDot::ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* params)
     : slice_line(line)
     , config_params(params)
     , pressed(false)
@@ -41,6 +41,18 @@ ControlDot::ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* para
     , update_lock(false)
 {
     setFlag(ItemIsMovable);
+    setFlag(ItemSendsGeometryChanges);
+}*/
+
+ControlDot::ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* params,
+                       bool isRightDendrogramDot, bool isLeftDendrogramDot) :
+    slice_line(line),
+    config_params(params),
+    pressed(false), left_bottom(left_bottom), update_lock(false), isRightDendrogramDot(isRightDendrogramDot),
+    isLeftDendrogramDot(isLeftDendrogramDot)
+{
+    if (!isRightDendrogramDot && !isLeftDendrogramDot)
+        setFlag(ItemIsMovable);
     setFlag(ItemSendsGeometryChanges);
 }
 
@@ -54,7 +66,7 @@ void ControlDot::paint(QPainter* painter, const QStyleOptionGraphicsItem* /*unus
     QRectF rect = boundingRect();
     QBrush brush(config_params->sliceLineColor);
 
-    if (pressed) {
+    if (pressed && !isRightDendrogramDot && !isLeftDendrogramDot) {
         brush.setColor(config_params->sliceLineHighlightColor);
     }
 
@@ -158,4 +170,10 @@ void ControlDot::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     pressed = false;
     update();
     QGraphicsItem::mouseReleaseEvent(event);
+    //std::cout << "CONTROLDOT MOUSE RELEASE EVENT" << std::endl;
+    if (!isRightDendrogramDot && !isLeftDendrogramDot)
+    {
+        emit right_dot_released();
+        emit left_dot_released();
+    }
 }

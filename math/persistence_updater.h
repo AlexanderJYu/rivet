@@ -38,22 +38,174 @@ class MultiBetti;
 class FIRep;
 class TemplatePoint;
 struct TemplatePointsMatrixEntry;
+//struct Subset_map;
 
 #include "template_points_matrix.h"
 
 #include <interface/progress.h>
 #include <map>
 #include <vector>
+#include <boost/unordered_map.hpp>
+#include "subset.h"
+#include "time_root.h"
+#include "computing_s.h"
+#include "debug.h"
+#include "math/bifiltration_data.h"
+
 
 class PersistenceUpdater {
 public:
-    PersistenceUpdater(Arrangement& m, FIRep& b, std::vector<TemplatePoint>& xi_pts, unsigned verbosity); //constructor for when we must compute all of the barcode templates
-
+    PersistenceUpdater(Arrangement& m, FIRep& b, BifiltrationData& b_data, std::vector<TemplatePoint>& xi_pts, unsigned verbosity); //constructor for when we must compute all of the barcode templates
     //PersistenceUpdater(Arrangement& m, std::vector<TemplatePoint>& xi_pts); //constructor for when we load the pre-computed barcode templates from a RIVET data file
 
     //functions to compute and store barcode templates in each 2-cell of the arrangement
     void store_barcodes_with_reset(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress); //hybrid approach -- for expensive crossings, resets the matrices and does a standard persistence calculation
     void store_barcodes_quicksort(std::vector<std::shared_ptr<Halfedge>>& path); ///TODO -- for expensive crossings, rearranges columns via quicksort and fixes the RU-decomposition globally
+
+    typedef std::vector<std::shared_ptr<TemplatePointsMatrixEntry>> zeta_seq;
+    typedef std::pair<std::pair<unsigned,unsigned>,int> bigrade_root;
+    typedef std::pair<unsigned,unsigned> bigrade;
+
+    void print_zeta_seq(zeta_seq& zs);
+
+    void print_iterator(std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it);
+
+    void print_oracle_image(std::map<int, Subset_map>& UF);
+
+    void print_true_bigrade(std::pair<int,int> big);
+
+    void print_T_next(boost::unordered::unordered_map<bigrade,
+                      boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                      bool with_comp_labels = false);
+
+    void recursively_print_T_cur(Time_root& T_cur);
+
+    static bool zsComparator(const std::shared_ptr<TemplatePointsMatrixEntry> e,
+                             const std::shared_ptr<TemplatePointsMatrixEntry> f);
+
+    /*static bool bigradeComparator(const std::pair<double,double> b1,
+                                  const std::pair<double,double> b2);*/
+
+    bool bigrade_geq(const std::pair<double,double> b1,
+                     const std::pair<double,double> b2)
+    {
+        return (b1.first >= b2.first && b1.second >= b2.second);
+    }
+
+    typedef std::pair<double,double> double_bigrade;
+
+    //template <class ForwardIterator>
+    //ForwardIterator bigrade_lower_bound (ForwardIterator first, ForwardIterator last, const double_bigrade& val)
+    std::vector<double_bigrade>::iterator bigrade_lower_bound(std::vector<double_bigrade>::iterator first,
+                                                              std::vector<double_bigrade>::iterator last,
+                                                              const double_bigrade& val)
+
+    {
+        std::vector<double_bigrade>::iterator it;
+        std::vector<double_bigrade>::iterator last_copy = last;
+        std::iterator_traits<std::vector<double_bigrade>::iterator>::difference_type count, step;
+        count = distance(first,last);
+        while (count>0)
+        {
+            it = last; step=count/2; std::advance (it,-1*step);
+            if (bigrade_geq(*it,val))
+            {
+                last=--it;
+                count-=step+1;
+                //debug() << "last = (" << last->first << "," << last->second << ")";
+            }
+            else count=step;
+        }
+        if (bigrade_geq(*last,val))
+            return last;
+        else // found element is < val
+        {
+            if (last == last_copy) // all elements in list are < val
+                return last;
+            else                     // there exists an element >= val
+                return last+1;
+        }
+
+    }
+
+    void draw_dendrogram(boost::unordered::unordered_map<std::pair<double,int>, Time_root>& time_root_to_tr,
+                                             Time_root& last_upper_tr);
+
+    // functions for testing templates vs. naive algorithm
+    std::string int_set_to_string(std::set<int> comp_label);
+    std::set<int> populate_ordered_component_label(Time_root& tr);
+    bool is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2);
+    Time_root compute_dendrogram_template(zeta_seq& zs);
+    void relabel_dendrogram_with_oracle(Time_root& tr);
+
+
+
+
+
+
+    //functions to compute and store dendrogram templates in each 2-cell of the arrangement
+    void store_dendrogram_templates(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress);
+
+    //stores a dendrogram template in a 2-cell of the arrangement
+    void store_initial_dendrogram_template(std::shared_ptr<Face> cell, zeta_seq& zs);
+
+    // instantiate a level (at the given bigrade) of T_next
+    void instantiate_level(std::map<int, Subset_map>& oracle,
+                           boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                           std::pair<unsigned,unsigned> big);
+
+    // populate component labels of a level (at the given bigrade) in T_next
+    void populate_component_labels(std::map<int, Subset_map>& oracle,
+                                   boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                                   bigrade big);
+
+    // populate num_leaves of all nodes in the dendrogram rooted at tr
+    int populate_num_leaves_and_birth_label_str(Time_root& tr);
+
+    // connect different levels (big_1 and big_2) of T_next
+    void connect_levels(std::map<int, Subset_map>& oracle,
+                        boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                        bigrade big_1,
+                        bigrade big_2);
+
+    // copy upper part of T_cur
+    void copy_upper_dendrogram(Time_root& T_cur,
+                               boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                               bigrade big,
+                               std::vector<bigrade_root>& parents_of_iplus1,
+                               std::map<int, Subset_map>& oracle,
+                               std::shared_ptr<Time_root> parent_ptr);
+
+    // convert component labels to birth_labels
+    void convert_component_to_birth_labels(
+            boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+            std::vector<bigrade> functor_bigrades);
+
+    // removes nodes with in and out degree 1 and null birth label
+    void remove_redundant_nodes(
+            std::shared_ptr<Time_root> tr_ptr,
+            bigrade lower_cutoff,
+            boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next);
+
+    //classify nodes of dendrogram during updates
+    void classify_nodes(std::vector<Time_root>& L,
+                        std::vector<Time_root>& i_minus_1,
+                        std::vector<Time_root>& i_plus_1,
+                        std::vector<Time_root>& U,
+                        Time_root& tr,
+                        std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_prime,
+                        bool it_i_minus_1_exists,
+                        bool it_i_plus_1_exists);
+
+    //get bigrade from TemplatePointsMatrixEntry
+    std::pair<unsigned,unsigned> get_bigrade(std::shared_ptr<TemplatePointsMatrixEntry> u);
+
+    //set oracle
+    void set_oracle(boost::unordered::unordered_map<std::pair<int,int>,std::map<int, Subset_map>>& oracle);
+    void set_cs(computing_s* cs);
+
+    //function to set all edge weights to uniform value for dendrogram testing
+    void set_uniform_anchor_weights(std::vector<std::shared_ptr<Halfedge>>& path);
 
     //function to set the "edge weights" for each anchor line
     void set_anchor_weights(std::vector<std::shared_ptr<Halfedge>>& path);
@@ -66,6 +218,10 @@ private:
 
     Arrangement& arrangement; //pointer to the DCEL arrangement in which the barcodes will be stored
     FIRep& bifiltration; //pointer to the bifiltration
+    //SimplexTree& bifiltration; //pointer to the bifiltration
+    BifiltrationData& bifiltration_data;
+    boost::unordered::unordered_map<std::pair<int,int>,std::map<int, Subset_map>> oracle;
+    computing_s* cs;
     int dim; //dimension of homology to be computed
 
     unsigned verbosity;

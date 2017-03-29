@@ -11,8 +11,10 @@ macx {
 
 CONFIG += c++11 debug
 
-QT       += core gui \
-		widgets
+QT       +=    core gui \
+                widgets
+
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 TARGET = RIVET
 TEMPLATE = app
@@ -58,6 +60,25 @@ SOURCES	+= main.cpp                         \
     timer.cpp \
     interface/console_interaction.cpp \
     numerics.cpp \
+    dendrogram_data.cpp \
+    dcel/arrangement_builder.cpp \
+    math/persistence_updater.cpp \
+    math/simplex_tree.cpp \
+    math/st_node.cpp \
+    computation.cpp \
+    interface/input_manager.cpp \
+    math/multi_betti.cpp \
+    # front_end/qneblock.cpp \
+    # front_end/qneconnection.cpp \
+    # front_end/qnemainwindow.cpp \
+    # front_end/qneport.cpp \
+    # front_end/qnodeseditor.cpp
+    qnodeseditor/qneblock.cpp \
+    qnodeseditor/qneconnection.cpp \
+    qnodeseditor/qnemainwindow.cpp \
+    qnodeseditor/qneport.cpp \
+    qnodeseditor/qnodeseditor.cpp \
+    math/bifiltration_data.cpp
 
 
 HEADERS  += visualizationwindow.h			\
@@ -97,9 +118,45 @@ HEADERS  += visualizationwindow.h			\
     dcel/serialization.h \
     interface/console_interaction.h \
     numerics.h \
+    dendrogram_data.h \
+    time_root.h \
+    computing_s.h \
+    Graph.h \
+    subset.h \
+    dcel/arrangement_builder.h \
+    dcel/arrangement_message.h \
+    computation.h \
+    # front_end/qneblock.h \
+    # front_end/qneconnection.h \
+    # front_end/qneport.h \
+    # front_end/qnodeseditor.h \
+    # front_end/qnemainwindow.h
+    dendrogram_viz.h \
+    qnodeseditor/IntervalTree.h \
+    qnodeseditor/qnemainwindow.h \
+    qnodeseditor/qnodeseditor.h \
+    qnodeseditor/qneconnection.h \
+    qnodeseditor/qneport.h \
+    qnodeseditor/qneblock.h \
+    math/bifiltration_data.h
 
 FORMS   += visualizationwindow.ui			\
 		dataselectdialog.ui \
     interface/progressdialog.ui \
     interface/aboutmessagebox.ui \
     interface/configuredialog.ui
+
+# QMAKE_MAC_SDK = macosx10.12
+
+CONFIG += c++11
+QMAKE_CFLAGS += -std=c++11 -stdlib=libc++ -mmacosx-version-min=10.8
+QMAKE_CXXFLAGS += -std=c++11 -stdlib=libc++ -mmacosx-version-min=10.8
+
+QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.9
+
+
+LIBS += -L"/usr/local/Cellar/boost/1.60.0_2/lib"
+INCLUDEPATH += "/usr/local/Cellar/boost/1.60.0_2/include"
+LIBS += -L"/usr/local/Cellar/boost/1.60.0_2/lib" -lboost_random
+
+INCLUDEPATH += "../qt4/QtCore"

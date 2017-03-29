@@ -29,12 +29,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "map_matrix.h"
 #include "multi_betti.h"
 #include "firep.h"
+//#include "graph.h"
+#include "dendrogram_data.h"
 
 #include <chrono>
 #include <stdexcept> //for error-checking and debugging
 #include <stdlib.h> //for rand()
 #include <timer.h>
 
+#include <iostream>
+#include <string>
+#include <boost/lexical_cast.hpp>
+//#include <boost/filesystem/path.hpp>
+//#include <boost/filesystem/operations.hpp>
+//#include <boost/filesystem/exception.hpp>
+#include <boost/graph/graphviz.hpp>
+#include "dendrogram_viz.h"
+#include <queue>
+/*
 //constructor for when we must compute all of the barcode templates
 PersistenceUpdater::PersistenceUpdater(Arrangement& m, FIRep& b, std::vector<TemplatePoint>& xi_pts, unsigned verbosity)
     : arrangement(m)
@@ -42,14 +54,42 @@ PersistenceUpdater::PersistenceUpdater(Arrangement& m, FIRep& b, std::vector<Tem
     , dim(b.hom_dim)
     , verbosity(verbosity)
     , template_points_matrix(m.x_exact.size(), m.y_exact.size())
+
 //    , testing(false)
 {
     //fill the xiSupportMatrix with the xi support points and anchors
     //  also stores the anchors in xi_pts
-    for (auto matrix_entry : template_points_matrix.fill_and_find_anchors(xi_pts)) {
+    std::cout << "========================= COMPUTE template_points_matrix: " << std::endl;
+    for (auto& matrix_entry : template_points_matrix.fill_and_find_anchors(xi_pts))
+    {
         //Add anchors to arrangement also
+        //std::cout << "(" << matrix_entry->x << "," << matrix_entry->y << ")";
         m.add_anchor(Anchor(matrix_entry));
     }
+    std::cout << std::endl;
+}*/
+
+//constructor for multi-critical dendrogram
+PersistenceUpdater::PersistenceUpdater(Arrangement& m, FIRep& b, BifiltrationData& b_data, std::vector<TemplatePoint>& xi_pts, unsigned verbosity)
+    : arrangement(m)
+    , bifiltration(b)
+    , bifiltration_data(b_data)
+    , dim(b.hom_dim)
+    , verbosity(verbosity)
+    , template_points_matrix(m.x_exact.size(), m.y_exact.size())
+
+//    , testing(false)
+{
+    //fill the xiSupportMatrix with the xi support points and anchors
+    //  also stores the anchors in xi_pts
+    std::cout << "========================= COMPUTE template_points_matrix: " << std::endl;
+    for (auto& matrix_entry : template_points_matrix.fill_and_find_anchors(xi_pts))
+    {
+        //Add anchors to arrangement also
+        //std::cout << "(" << matrix_entry->x << "," << matrix_entry->y << ")";
+        m.add_anchor(Anchor(matrix_entry));
+    }
+    std::cout << std::endl;
 }
 
 ////constructor for when we load the pre-computed barcode templates from a RIVET data file
@@ -61,6 +101,1704 @@ PersistenceUpdater::PersistenceUpdater(Arrangement& m, FIRep& b, std::vector<Tem
 //    //fill the xiSupportMatrix with the xi support points
 //    template_points_matrix.fill_and_find_anchors(xi_pts, m);
 //}
+
+//typedef boost::GraphvizGraph Graph;
+//typedef boost::graph_traits<Graph>::vertex_descriptor VertexDescriptor;
+
+/*
+void PersistenceUpdater::draw_dendrogram(boost::unordered::unordered_map<std::pair<double,int>, Time_root>& time_root_to_tr,
+                                         Time_root& last_upper_tr)
+{
+
+}*/
+
+enum {is_forest_connector = -2}; // MAGIC NUMBER
+
+void PersistenceUpdater::print_zeta_seq(zeta_seq& zs)
+{
+    for (auto entry : zs)
+    {
+        std::cout << "(" << entry->x << "," << entry->y << ")";
+    }
+    std::cout << std::endl;
+}
+
+void PersistenceUpdater::print_iterator(std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it)
+{
+    std::cout << "(x,y) = (" << (*it)->x << "," << (*it)->y << ")" << std::endl;
+}
+
+void PersistenceUpdater::print_oracle_image(std::map<int, Subset_map>& UF)
+{
+    for (auto v_subset : UF)
+    {
+        std::cout << "v = " << v_subset.first << std::endl;
+        std::cout << "v.parent = " << v_subset.second.parent << std::endl;
+        std::cout << "v.rank = " << v_subset.second.rank << std::endl;
+    }
+}
+
+void PersistenceUpdater::print_true_bigrade(std::pair<int,int> big)
+{
+    std::cout << "(" << arrangement.x_grades[big.first] << ","
+              << arrangement.y_grades[big.second] << ")" << std::endl;
+}
+
+void PersistenceUpdater::print_T_next(boost::unordered::unordered_map<bigrade,
+                                      boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                                      bool with_comp_labels)
+{
+    for(auto big_r_tr : T_next)
+    {
+        //std::pair<unsigned,unsigned> big = big_r_tr.first;
+        for (auto r_tr : big_r_tr.second)
+        {
+            std::cout << "===============" << std::endl;
+            Time_root::print_tr(*r_tr.second, with_comp_labels);
+            /*if (with_comp_labels)
+            {
+                std::stringstream ss_cl;
+                ss_cl << "(";
+                for (auto v : r_tr.second.component_label)
+                    ss_cl << v << ",";
+                ss_cl << ")";
+                std::cout << "cl = " << ss_cl.str() << std::endl;
+            }*/
+            std::cout << "children: " << std::endl;
+            Time_root::print_children((*r_tr.second).children, with_comp_labels);
+        }
+    }
+}
+
+/*
+bool PersistenceUpdater::bigradeComparator(const std::pair<double,double> b1,
+                                           const std::pair<double,double> b2)
+{
+    return (b1.first < b2.first) || ((b1.first == b2.first) && (b1.second < b2.second));
+}*/
+
+
+bool PersistenceUpdater::zsComparator(const std::shared_ptr<TemplatePointsMatrixEntry> e,
+                                      const std::shared_ptr<TemplatePointsMatrixEntry> f)
+{
+    return (e->x < f->x) || (e->x == f->x && e->y < f->y);
+}
+
+bool PersistenceUpdater::is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2)
+{
+    //std::string comp_label_1 = int_set_to_string(tr1.ordered_component_label);
+    //std::string comp_label_2 = int_set_to_string(tr2.ordered_component_label);
+    //bool comp_labels_match = (comp_label_1 == comp_label_2);
+    //std::cout << "comp_label_1 = " << comp_label_1 << std::endl;
+    //std::cout << "comp_label_2 = " << comp_label_2 << std::endl;
+    std::string cl1 = int_set_to_string(tr1.ordered_component_label);
+    std::string cl2 = int_set_to_string(tr2.ordered_component_label);
+
+    bool is_isomorphic = (tr1.bigrade == tr2.bigrade) &&
+                         (cl1 == cl2) &&
+                         (tr1.num_leaves == tr2.num_leaves);
+
+    std::cout << "is_isomorphic = " << is_isomorphic << std::endl;
+    std::cout << "tr1.bigrade = (" << tr1.bigrade.first << "," << tr1.bigrade.second << ")" << std::endl;
+    std::cout << "tr2.bigrade = (" << tr2.bigrade.first << "," << tr2.bigrade.second << ")" << std::endl;
+    std::cout << "tr1.ordered_comp_label = " << cl1 << std::endl;
+    std::cout << "tr2.ordered_comp_label = " << cl2 << std::endl;
+    std::cout << "tr1.num_leaves = " << tr1.num_leaves << std::endl;
+    std::cout << "tr2.num_leaves = " << tr2.num_leaves << std::endl;
+
+    for (auto child_ptr_1 : tr1.children)
+    {
+        Time_root& child_1 = *child_ptr_1;
+        std::string comp_label_1 = int_set_to_string(child_1.ordered_component_label);
+        bool match_found = false;
+        for (auto child_ptr_2 : tr2.children)
+        {
+            Time_root& child_2 = *child_ptr_2;
+            std::string comp_label_2 = int_set_to_string(child_2.ordered_component_label);
+            if (comp_label_1 == comp_label_2)
+            {
+                match_found = true;
+                is_isomorphic = (is_isomorphic && is_dendrogram_isomorphic(child_1, child_2));
+            }
+        }
+        if (!match_found)
+            throw std::runtime_error("match not found");
+    }
+    return is_isomorphic;
+}
+
+std::set<int> PersistenceUpdater::populate_ordered_component_label(Time_root& tr)
+{
+    for (int v : tr.birth_label)
+        tr.ordered_component_label.insert(v);
+    for (auto tr_ptr : tr.children)
+    {
+        Time_root& child = *tr_ptr;
+        std::set<int> child_comp_label = populate_ordered_component_label(child);
+        for (int v : child_comp_label)
+            tr.ordered_component_label.insert(v);
+    }
+    return tr.ordered_component_label;
+}
+
+std::string PersistenceUpdater::int_set_to_string(std::set<int> comp_label)
+{
+    std::stringstream ss;
+    for (int v : comp_label)
+    {
+        ss << v << ",";
+    }
+    return ss.str();
+}
+
+
+
+Time_root PersistenceUpdater::compute_dendrogram_template(zeta_seq& zs)
+{
+    boost::unordered::unordered_map<double, double_bigrade> appearance_to_bigrade; // map from time of appearance to point in zeta seq
+    boost::unordered::unordered_map<double_bigrade, double> bigrade_to_appearance; // inverse map
+    std::vector<double_bigrade> zs_bigrades;
+
+    int j = 0;
+    for(std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it = zs.begin(); it != zs.end(); ++it)
+    {
+        auto entry = *it;
+        double_bigrade big = double_bigrade(entry->x,entry->y);
+        zs_bigrades.push_back(big);
+        appearance_to_bigrade[j] = big;
+        bigrade_to_appearance[big] = j;
+        j += 1;
+    }
+
+    // 1-critical version SimplexSet vertices = bifiltration.get_ordered_simplices();
+    // 1-critical version SimplexSet edges = bifiltration.get_ordered_high_simplices();
+    boost::unordered::unordered_map<unsigned, double> vertex_appearance;
+    boost::unordered::unordered_map<unsigned, std::pair<double,double>> vertex_bigrade;
+
+    SimplexInfo* vertices_to_grades = bifiltration_data.getSimplices(0);
+    SimplexInfo* edges_to_grades = bifiltration_data.getSimplices(1);
+
+    std::cout << "vertexVec_grade info: " << std::endl;
+    for (auto vertexVec_grade : *vertices_to_grades)
+    {
+        unsigned v = vertexVec_grade.first[0];
+        AppearanceGrades grades = vertexVec_grade.second;
+        for (Grade g : grades)
+        {
+            double_bigrade big = double_bigrade(g.x,g.y);
+            std::vector<double_bigrade>::iterator it_lowerbound;
+            it_lowerbound = bigrade_lower_bound(zs_bigrades.begin(),zs_bigrades.end(),big);
+            double_bigrade lowerbound = *it_lowerbound;
+            double birth = bigrade_to_appearance[lowerbound];
+
+
+            std::cout << "(v,x,y,birth) = (" <<
+                    v << " , " <<
+                    g.x << " , " <<
+                    g.y << " , " <<
+                    birth << ")" << std::endl;
+
+            if (vertex_appearance.find(v) == vertex_appearance.end())
+            {
+                vertex_appearance[v] = birth;
+                vertex_bigrade[v] = lowerbound;
+            }
+            else
+            {
+                if (birth < vertex_appearance[v])
+                {
+                    vertex_appearance[v] = birth;
+                    vertex_bigrade[v] = lowerbound;
+                }
+            }
+        }
+    }
+
+    /* 1-critical version
+    for (auto st_node : vertices)
+    {
+        unsigned v = st_node->get_vertex();
+        unsigned x = st_node->grade_x();
+        unsigned y = st_node->grade_y();
+        //double birth = y;
+        double_bigrade big = double_bigrade(x,y);
+        std::vector<double_bigrade>::iterator it_lowerbound;
+        it_lowerbound = bigrade_lower_bound(zs_bigrades.begin(),zs_bigrades.end(),big);
+        double_bigrade lowerbound = *it_lowerbound;
+        double birth = bigrade_to_appearance[lowerbound];
+        /*it_lowerbound = std::lower_bound(zs_bigrades.begin(),zs_bigrades.end(),big,bigradeComparator);
+        double_bigrade bound = *it_lowerbound;
+        if (bound != big)
+            bound = std::upper_bound(zs_bigrades.begin(),zs_bigrades.end(),big,bigradeComparator);
+        double birth = bigrade_to_appearance[bound];*/
+
+        /*
+        debug() << "lowerbound = (" << lowerbound.first << "," << lowerbound.second << ")";
+
+        debug() << "(v,x,y,birth) = (" <<
+                v << " , " <<
+                x << " , " <<
+                y << " , " <<
+                birth << ")";
+        if (vertex_appearance.find(v) == vertex_appearance.end())
+        {
+            vertex_appearance[v] = birth;
+            vertex_bigrade[v] = lowerbound;
+        }
+        else
+        {
+            if (birth < vertex_appearance[v])
+            {
+                vertex_appearance[v] = birth;
+                vertex_bigrade[v] = lowerbound;
+            }
+        }
+    }*/
+
+    boost::unordered::unordered_map<std::pair<unsigned,unsigned>, double> edge_appearance;
+    boost::unordered::unordered_map<std::pair<unsigned,unsigned>, std::pair<double,double>> edge_bigrade;
+
+    for (auto edgeVec_grade : *edges_to_grades)
+    {
+        std::vector<int> edge_vector = edgeVec_grade.first;
+        AppearanceGrades grades = edgeVec_grade.second;
+        std::pair<unsigned,unsigned> edge (edge_vector[0], edge_vector[1]);
+        for (Grade g : grades)
+        {
+            double_bigrade big = double_bigrade(g.x,g.y);
+            std::vector<double_bigrade>::iterator it_lowerbound;
+            it_lowerbound = bigrade_lower_bound(zs_bigrades.begin(),zs_bigrades.end(),big);
+            if (it_lowerbound == zs_bigrades.end()) //case where edge is born after last element in zs
+                continue;
+            double_bigrade lowerbound = *it_lowerbound;
+            double birth = bigrade_to_appearance[lowerbound];
+
+            if (edge_appearance.find(edge) == edge_appearance.end())
+            {
+                edge_appearance[edge] = birth;
+                edge_bigrade[edge] = lowerbound;
+            }
+            else
+            {
+                if (birth < edge_appearance[edge])
+                {
+                    edge_appearance[edge] = birth;
+                    edge_bigrade[edge] = lowerbound;
+                }
+            }
+        }
+    }
+
+    /* 1-critical version
+    for (auto st_node : edges)
+    {
+        int global_index = st_node->global_index();
+        std::vector<int> edge_vector = bifiltration.find_vertices(global_index);
+        std::pair<unsigned,unsigned> edge (edge_vector[0], edge_vector[1]);
+        unsigned x = st_node->grade_x();
+        unsigned y = st_node->grade_y();
+        //double birth = y;
+        double_bigrade big = double_bigrade(x,y);
+        std::vector<double_bigrade>::iterator it_lowerbound;
+        it_lowerbound = bigrade_lower_bound(zs_bigrades.begin(),zs_bigrades.end(),big);
+        if (it_lowerbound == zs_bigrades.end()) //case where edge is born after last element in zs
+            continue;
+        double_bigrade lowerbound = *it_lowerbound;
+        double birth = bigrade_to_appearance[lowerbound];
+
+        std::unordered_set<std::pair<int,int>> T_1 = cs->get_T_1();
+        std::pair<int,int> big_int = std::pair<int,int>((int) big.first,(int) big.second);
+
+        // case where edge does not live in T_1 \subset S
+        /*if (T_1.find(big_int) == T_1.end())
+        {
+            continue;
+        }
+
+        if (edge_appearance.find(edge) == edge_appearance.end())
+        {
+            edge_appearance[edge] = birth;
+            edge_bigrade[edge] = lowerbound;
+        }
+        else
+        {
+            if (birth < edge_appearance[edge])
+            {
+                edge_appearance[edge] = birth;
+                edge_bigrade[edge] = lowerbound;
+            }
+        }
+    }*/
+
+    DenseGRAPH<Edge>* graph = new DenseGRAPH<Edge>(vertex_appearance.size(), true);
+    //debug() << "print edges of graph";
+    for (auto edge_wt : edge_appearance)
+    {
+        std::pair<unsigned,unsigned> e = edge_wt.first;
+        unsigned v = e.first;
+        unsigned w = e.second;
+        graph-> insert(EdgePtr( new Edge(v,w,edge_wt.second,edge_bigrade[e])));
+        /*debug() << "(v,w,edge_wt,edge_bigrade) = (" <<
+                   v << " , " <<
+                   w << " , " <<
+                   edge_wt.second << " , (" <<
+                   edge_bigrade[e].first << " , " << edge_bigrade[e].second << "))";
+        */
+    }
+
+    std::vector<EdgePtr> mst;
+    boost::unordered::unordered_map<std::pair<double,int>, Time_root> time_root_to_tr;
+
+    //debug() << "START compute dendrogram template";
+    std::vector<Time_root> upper_trs;
+    Time_root tr;
+    Dendrogram_data::compute_dendrogram(graph, mst, time_root_to_tr, tr, vertex_appearance, vertex_bigrade, appearance_to_bigrade, upper_trs);
+    /*debug() << "upper_trs: ";
+    Time_root::print_trs(upper_trs, true);
+    for ( std::vector<EdgePtr>::const_iterator it = mst.begin(); it != mst.end(); ++it )
+    {
+
+        debug() << it->get()->v << " "
+                << it->get()->w << " "
+                << it->get()->wt << "\n";
+    }*/
+    if (upper_trs.size() > 1)
+    {
+        Time_root forest_connector;
+        forest_connector.r = is_forest_connector;
+        forest_connector.bigrade = bigrade(UINT_MAX,UINT_MAX);
+        for (Time_root& upper_tr : upper_trs)
+        {
+            forest_connector.children.push_back(std::make_shared<Time_root>(upper_tr));
+            forest_connector.num_leaves += upper_tr.num_leaves;
+        }
+        tr = forest_connector;
+        std::cout << "forest_connector : " << std::endl;
+        Time_root::print_tr(forest_connector);
+        Time_root::print_children(forest_connector.children);
+    }
+    else // upper_trs.size() == 1
+        tr = upper_trs.front();
+
+    //debug() << "END compute dendrogram template";
+
+    for (auto t_big : appearance_to_bigrade)
+    {
+        auto t = t_big.first;
+        auto big = t_big.second;
+        std::cout << "t = " << t << " , " << "big = ("
+                  << big.first << "," << big.second << ")"
+                  << std::endl;
+    }
+    return tr;
+}
+
+void PersistenceUpdater::relabel_dendrogram_with_oracle(Time_root& tr)
+{
+    if (tr.r != is_forest_connector)
+    {
+        int r = tr.r;
+        auto ora = oracle[tr.bigrade];
+        int h_r = Find(ora, r);
+        tr.r = h_r;
+    }
+    for (auto child_ptr : tr.children)
+        relabel_dendrogram_with_oracle(*child_ptr);
+    return;
+}
+
+void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress)
+{
+    // get underlying buffer
+    //std::streambuf* orig_buf = std::cout.rdbuf();
+
+    // set null
+    //std::cout.rdbuf(NULL);
+
+    // PART 1: INITIAL CELL COMPUTATION
+    debug() << "PART 1: INITIAL CELL COMPUTATION";
+    int zeta_seq_length = template_points_matrix.height();
+    debug() << "zeta_seq_length = " << zeta_seq_length;
+    zeta_seq cur_zs;
+
+    debug() << "initial zs";
+    for (int j = 0; j < zeta_seq_length; j++)
+    {
+        debug() << "j = " << j << " , ";
+        if (template_points_matrix.get_row(j) != NULL)
+        {
+            const auto& entry = template_points_matrix.get_row(j);
+            debug() << "(" << entry->x << "," << entry->y << ")";
+            cur_zs.push_back(entry);
+        }
+    }
+    debug() << " ========================= initial zs:";
+    print_zeta_seq(cur_zs);
+
+    //store the dendrogram template in the first cell
+    debug() << "store the dendrogram template in the first cell";
+    std::shared_ptr<Face> first_cell = arrangement.topleft->get_twin()->get_face();
+    store_initial_dendrogram_template(first_cell, cur_zs);
+    Time_root& tr_first = first_cell->get_dendrogram();
+    std::cout << "tr_first before relabeling: " << std::endl;
+    Time_root::recursively_print_tr(tr_first);
+    //recursively_print_T_cur(tr_first);
+
+    // relabel tr_first so that its .r labels correspond to oracle
+    relabel_dendrogram_with_oracle(tr_first);
+    std::cout << "tr_first after relabeling: " << std::endl;
+    Time_root::recursively_print_tr(tr_first);
+
+    /*Time_root T_cur = tr_first;
+
+    std::cout << "extend dendrogram to last bigrade in cur_zs" << std::endl;
+    if (get_bigrade(cur_zs.back()) != tr_first.bigrade)
+    {
+        T_cur.bigrade = get_bigrade(cur_zs.back());
+        //T_cur.children.push_back(std::make_shared<Time_root>(tr_first));
+    }*/
+    Time_root T_cur = tr_first;
+    //bigrade extended_bigrade = tr_first.bigrade; // used in step 4 + 5
+    //tr_first.bigrade = get_bigrade(cur_zs.back()); //extend dendrogram template to last bigrade in cur_zs
+    //Time_root::print_tr(tr_first);
+    Dendrogram_viz::write_dendrogram_dot_file(tr_first, "../../../initial.dot", arrangement.x_grades, arrangement.y_grades);
+
+    debug() << "first_cell = " << arrangement.FID(first_cell);
+
+    // Time_root T_cur = tr_first;
+
+    //truncate cur_zs to the minimum length without changing dendrogram
+    //bigrade zs_truncation_pt = T_cur.bigrade; // we can truncate all bigrades past this point in cur_zs since they do not affect the dendrogram
+    //std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_truncation_pt;
+    /*for (auto entry : cur_zs)
+    {
+        if (get_bigrade(entry) == zs_truncation_pt)
+    }*/
+    /*int n = 0;
+    for (auto it = cur_zs.begin(); it != cur_zs.end(); ++it)
+    {
+        n += 1;
+        if (get_bigrade(*it) == zs_truncation_pt)
+            break;
+    }*/
+    std::cout << " ========================= initial zs:";
+    print_zeta_seq(cur_zs);
+
+    /*cur_zs.resize(n);
+
+    std::cout << " ========================= truncated initial zs:";
+    print_zeta_seq(cur_zs);*/
+
+    boost::unordered::unordered_map<std::shared_ptr<Face>, zeta_seq> face_to_zs;
+
+    // PART 2: TRAVERSE PATH AND PERFORM DENDROGRAM UPDATES
+    debug() << "PART 2: TRAVERSE PATH AND PERFORM DENDROGRAM UPDATES";
+
+
+
+    for (unsigned j = 0; j < path.size(); j++)
+    {
+        std::cout << "---------------------------------------------------------" << std::endl;
+        std::cout << "step j = " << j << std::endl;
+        progress.progress(j); //update progress bar
+
+        //determine which anchor is represented by this edge
+        std::shared_ptr<Anchor> cur_anchor = (path[j])->get_anchor();
+        std::shared_ptr<TemplatePointsMatrixEntry> at_anchor = cur_anchor->get_entry();
+
+        std::cout << "entry at_anchor = (" << at_anchor->x << "," << at_anchor->y << ")" << std::endl;
+
+        //get equivalence classes for this anchor
+        std::shared_ptr<TemplatePointsMatrixEntry> down = at_anchor->down;
+        std::shared_ptr<TemplatePointsMatrixEntry> left = at_anchor->left;
+
+        // iterator for the changed zeta, z_i' in paper
+        std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_prime;
+
+        // compute next zeta sequence
+        zeta_seq next_zs;
+        next_zs = cur_zs;
+
+        // Case: strict anchor
+        if (down != nullptr && left != nullptr) //then this is a strict anchor and some simplices swap
+        {
+            std::cout << "CASE : strict anchor" << std::endl;
+            std::cout << "down = (" << down->x << "," << down->y << ")" << std::endl;
+            std::cout << "left = (" << left->x << "," << left->y << ")" << std::endl;
+            if (verbosity >= 6) {
+                debug() << "  step " << j << " of path: crossing (strict) anchor at (" << cur_anchor->get_x() << ", " << cur_anchor->get_y() << ") into cell " << arrangement.FID((path[j])->get_face()) << "; edge weight: " << cur_anchor->get_weight();
+            }
+
+            if (cur_anchor->is_above()) //then the anchor is crossed from below to above
+            {
+                std::cout << "anchor is crossed from below to above" << std::endl;
+                // binary search for down in cur_zs
+                std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_down;
+                it_down = std::lower_bound(next_zs.begin(),next_zs.end(),down,zsComparator);
+                std::cout << "*it_down before = (" << get_bigrade(*it_down).first << "," << get_bigrade(*it_down).second << ")" << std::endl;
+                *it_down = left;
+                std::cout << "*it_down after = (" << get_bigrade(*it_down).first << "," << get_bigrade(*it_down).second << ")" << std::endl;
+                it_prime = it_down;
+            }
+            else //then anchor is crossed from above to below
+            {
+                std::cout << "anchor is crossed from above to below" << std::endl;
+                // binary search for left in cur_zs
+                std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_left;
+                it_left = std::lower_bound(next_zs.begin(),next_zs.end(),left,zsComparator);
+                std::cout << "*it_left before = (" << get_bigrade(*it_left).first << "," << get_bigrade(*it_left).second << ")" << std::endl;
+                *it_left = down;
+                std::cout << "*it_left after = (" << get_bigrade(*it_left).first << "," << get_bigrade(*it_left).second << ")" << std::endl;
+                it_prime = it_left;
+            }
+        }
+
+        // case : weak anchor
+        else
+        {
+            std::cout << "CASE : weak anchor" << std::endl;
+            bool neighbor_is_down = true;
+            std::shared_ptr<TemplatePointsMatrixEntry> neighbor = at_anchor->down;
+            if (neighbor == nullptr)
+            {
+                std::cout << "neighbor == nullptr" << std::endl;
+                neighbor = at_anchor->left;
+                neighbor_is_down = false;
+            }
+            std::cout << "neighbor = (" << neighbor->x << "," << neighbor->y << ")" << std::endl;
+            std::cout << "neighbor_is_down = " << neighbor_is_down << std::endl;
+            std::cout << "cur_anchor->is_above() = " << cur_anchor->is_above() << std::endl;
+            // split
+            if ((cur_anchor->is_above() && !neighbor_is_down) || (!cur_anchor->is_above() && neighbor_is_down))
+            {
+                std::cout << "split case" << std::endl;
+                // binary search for neighbor in cur_zs
+                std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_anchor;
+                it_anchor = std::lower_bound(next_zs.begin(),next_zs.end(),at_anchor,zsComparator);
+                std::cout << "*it_anchor = (" << get_bigrade(*it_anchor).first << "," << get_bigrade(*it_anchor).second << ")" << std::endl;
+                next_zs.insert(it_anchor,neighbor);
+                //std::cout << "========================= next_zs:";
+                //print_zeta_seq(next_zs);
+                it_prime = std::lower_bound(next_zs.begin(),next_zs.end(),neighbor,zsComparator);
+                std::cout << "*it_prime = (" << get_bigrade(*it_prime).first << "," << get_bigrade(*it_prime).second << ")" << std::endl;
+                //std::cout << "========================= next_zs:";
+                //print_zeta_seq(next_zs);
+            }
+
+            // merge
+            else
+            {
+                std::cout << "merge case" << std::endl;
+                // binary search for neighbor in cur_zs
+                std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_neighbor;
+                it_neighbor = std::lower_bound(next_zs.begin(),next_zs.end(),neighbor,zsComparator);
+                std::cout << "*it_neighbor = (" << get_bigrade(*it_neighbor).first << "," << get_bigrade(*it_neighbor).second << ")" << std::endl;
+                it_prime = std::next(it_neighbor,1);
+                std::cout << "*it_prime before = (" << get_bigrade(*it_prime).first << "," << get_bigrade(*it_prime).second << ")" << std::endl;
+                next_zs.erase(it_neighbor);
+                //std::cout << "========================= next_zs:";
+                //print_zeta_seq(next_zs);
+                it_prime = std::prev(it_prime,1); // need to increment iterator because we deleted the previous element
+                std::cout << "*it_prime after = (" << get_bigrade(*it_prime).first << "," << get_bigrade(*it_prime).second << ")" << std::endl;
+            }
+        }
+
+        std::cout << "========================= cur_zs:";
+        print_zeta_seq(cur_zs);
+        std::cout << "========================= next_zs:";
+        print_zeta_seq(next_zs);
+
+        // if we have already handled this face, move on to next face
+        std::shared_ptr<Face> current_face = (path[j])->get_face();
+        if (current_face->has_been_visited())
+        {
+            std::cout << "current_face->has_been_visited" << std::endl;
+            std::cout << "face_to_zs[current_face] = ";
+            print_zeta_seq(face_to_zs[current_face]);
+            T_cur = current_face->get_dendrogram();
+            //std::cout << "T_cur:" << std::endl;
+            Time_root::recursively_print_tr(T_cur);
+            cur_zs = next_zs;
+            cur_anchor->toggle(); // we need to remember we crossed cur_anchor (as we do in step 8)
+            continue;
+        }
+
+        //boost::unordered::unordered_map<int, Time_root> K;
+        //enum V_type {L, i_minus_1, i_plus_1, U};
+        //boost::unordered::unordered_map<V_type, Time_root>
+        std::vector<Time_root> L;
+        std::vector<Time_root> i_minus_1;
+        std::vector<Time_root> i_plus_1;
+        std::vector<Time_root> U;
+        //std::vector<unsigned> R_i_minus_1;
+        bool it_i_minus_1_exists = false;
+        bool it_i_plus_1_exists = false;
+
+        std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_i_minus_1;
+        if (next_zs.begin() != it_prime)
+        {
+            std::cout << "it_i_minus_1 is defined" << std::endl;
+            it_i_minus_1 = std::prev(it_prime,1);
+            it_i_minus_1_exists = true;
+        }
+        std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_i_plus_1;
+        if (std::prev(next_zs.end())!= it_prime)
+        {
+            std::cout << "it_i_plus_1 is defined" << std::endl;
+            it_i_plus_1 = std::next(it_prime,1);
+            it_i_plus_1_exists = true;
+        }
+
+        // step 0
+        // I DONT KNOW WHETHER THE INITIALIZATION OF top_bigrade IS RIGHT
+        bigrade top_bigrade; //bigrade of top of dendrogram
+        if (it_i_plus_1_exists)
+            top_bigrade = get_bigrade(*it_i_plus_1);
+        else
+            top_bigrade = get_bigrade(*it_prime);
+        std::cout << "top_bigrade = (" << top_bigrade.first << "," << top_bigrade.second << ")" <<std::endl;
+
+        int top_v;
+        if (T_cur.r == is_forest_connector)
+            top_v = is_forest_connector;
+        else
+        {
+            if (!it_i_plus_1_exists)
+            {
+                auto oracle_prime = oracle[get_bigrade(*it_prime)];
+                top_v = Find(oracle_prime, T_cur.r);
+            }
+            else
+            {
+                auto oracle_i_plus_1 = oracle[get_bigrade(*it_i_plus_1)];
+                top_v = Find(oracle_i_plus_1, T_cur.r);
+            }
+        }
+
+
+
+        // step 1
+        // classify all nodes of T_cur by types L,i-1,i+1,U
+        std::cout << "========================= STEP 1 " << std::endl;
+        std::cout << "T_cur : " << std::endl;
+        Time_root::print_tr(T_cur);
+        std::cout << "it_prime = " << std::endl;
+        print_iterator(it_prime);
+        if (it_i_minus_1_exists)
+        {
+            std::cout << "it_i_minus_1 = " << std::endl;
+            print_iterator(it_i_minus_1);
+        }
+
+        if (it_i_plus_1_exists)
+        {
+            std::cout << "it_i_plus_1 = " << std::endl;
+            print_iterator(it_i_plus_1);
+        }
+
+        if (T_cur.bigrade == get_bigrade(*it_i_plus_1))
+            i_plus_1.push_back(T_cur);
+
+        std::cout << "Classify nodes: " << std::endl;
+        std::cout << "it_i_minus_1_exists = " << it_i_minus_1_exists << std::endl;
+        std::cout << "it_i_plus_1_exists = " << it_i_plus_1_exists << std::endl;
+
+        std::cout << "true bigrade of it_prime:" << std::endl;
+        print_true_bigrade(get_bigrade(*it_prime));
+
+        // classify T_cur's top node (could restructure classify nodes to encapsulate this step)
+        if (it_i_plus_1_exists)
+        {
+            std::cout << "true bigrade of it_i_plus_1:" << std::endl;
+            print_true_bigrade(get_bigrade(*it_i_plus_1));
+            if (T_cur.bigrade == get_bigrade(*it_i_plus_1))
+                i_plus_1.push_back(T_cur);
+        }
+        if (it_i_minus_1_exists)
+        {
+            //std::cout << "reached classification of i_minus_1 and L" << std::endl;
+            //std::cout << "child : " << std::endl;
+            //Time_root::print_tr(child);
+            std::cout << "true bigrade of it_i_minus_1:" << std::endl;
+            print_true_bigrade(get_bigrade(*it_i_minus_1));
+            if (T_cur.bigrade == get_bigrade(*it_i_minus_1))
+                i_minus_1.push_back(T_cur);
+        }
+        // classify rest of the nodes in T_cur
+        classify_nodes(L, i_minus_1, i_plus_1, U, T_cur, it_prime, it_i_minus_1_exists, it_i_plus_1_exists);
+        std::cout << ">>>>>>>>>>>> L = " << std::endl;
+        Time_root::print_trs(L, true);
+        std::cout << ">>>>>>>>>>>> i_minus_1 = " << std::endl;
+        Time_root::print_trs(i_minus_1, true);
+        std::cout << ">>>>>>>>>>>> i_plus_1 = " << std::endl;
+        Time_root::print_trs(i_plus_1, true);
+        std::cout << ">>>>>>>>>>>> U = " << std::endl;
+        Time_root::print_trs(U, true);
+
+        if (it_i_minus_1_exists)
+        {
+            std::map<int, Subset_map>& oracle_i_minus_1 = oracle[get_bigrade(*it_i_minus_1)]; // H[z_i'] in paper
+            std::cout << "oracle_i_minus_1:" << std::endl;
+            print_oracle_image(oracle_i_minus_1);
+        }
+
+        // determine vertex representative of T_cur depending on whether it_i_plus_1 exists or not
+        int T_cur_root;
+        if (T_cur.r == is_forest_connector)
+            T_cur_root = is_forest_connector;
+        else
+        {
+            if (!it_i_plus_1_exists)
+            {
+                auto oracle_prime = oracle[get_bigrade(*it_prime)];
+                T_cur_root = Find(oracle_prime, T_cur.r);
+            }
+            else
+            {
+                if (T_cur.bigrade == get_bigrade(*it_i_plus_1))
+                {
+                    auto oracle_i_plus_1 = oracle[get_bigrade(*it_i_plus_1)];
+                    T_cur_root = Find(oracle_i_plus_1, T_cur.r);
+                }
+                else
+                    T_cur_root = T_cur.r;
+            }
+        }
+
+
+        std::cout << "T_cur_root = " << T_cur_root << std::endl;
+        std::cout << "T_cur.r = " << T_cur.r << std::endl;
+
+        boost::unordered::unordered_map<bigrade,
+        boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>> T_next; //K in paper
+
+        // Instantiate nodes in i - 1
+        for (Time_root& tr : i_minus_1)
+        {
+            std::cout << "instantiate nodes in i - 1" << std::endl;
+            Time_root tr_copy = tr;
+            T_next[tr.bigrade][tr.r] = std::make_shared<Time_root>(tr_copy);
+        }
+
+        // Instantiate nodes in L plus their functor extensions
+        // Need to copy actual roots in L? instead of using references
+        for (Time_root& tr : L)
+        {
+            //Time_root tr_copy = tr;
+            std::cout << "instantiate nodes in L" << std::endl;
+            auto ora = oracle[get_bigrade(*it_i_minus_1)];
+            int h_r = Find(ora, tr.r);
+            Time_root tr_prime;
+            //tr_prime.r = tr.r;
+            tr_prime.r = h_r;
+            tr_prime.bigrade = get_bigrade(*it_i_minus_1);
+            tr_prime.children.push_back(std::make_shared<Time_root>(tr));
+            //T_next[bigrade_root(tr_prime.bigrade,tr_prime.r)] = tr_prime;
+            T_next[tr_prime.bigrade][tr_prime.r] = std::make_shared<Time_root>(tr_prime);
+        }
+
+        //std::cout << "Status of T_next at beginning of step 2:" << std::endl;
+        //print_T_next(T_next);
+
+        // step 2
+        std::map<int, Subset_map>& oracle_it_prime = oracle[get_bigrade(*it_prime)]; // H[z_i'] in paper
+        std::cout << "Oracle_it_prime:" << std::endl;
+        print_oracle_image(oracle_it_prime);
+        instantiate_level(oracle_it_prime, T_next, get_bigrade(*it_prime)); // instantiate K[z_i']
+        std::cout << "Status of T_next after instantiate_level for step 2:" << std::endl;
+        //print_T_next(T_next, true);
+        if (it_i_minus_1_exists)
+        {
+            std::cout << "connect levels for step 2" << std::endl;
+            connect_levels(oracle_it_prime, T_next, get_bigrade(*it_i_minus_1), get_bigrade(*it_prime));
+            std::cout << "Status of T_next after connect_levels level for step 2:" << std::endl;
+            print_T_next(T_next, true);
+        }
+
+
+        // step 3
+        std::cout << "step 3" << std::endl;
+        if (it_i_plus_1_exists)
+        {
+            std::map<int, Subset_map>& oracle_it_i_plus_1 = oracle[get_bigrade(*it_i_plus_1)]; // H[z_{i+1}] in paper
+            std::cout << "Oracle_it_i_plus_1:" << std::endl;
+            print_oracle_image(oracle_it_i_plus_1);
+            instantiate_level(oracle_it_i_plus_1, T_next, get_bigrade(*it_i_plus_1));
+            std::cout << "Status of T_next after instantiate_level for step 3:" << std::endl;
+            //print_T_next(T_next, true);
+            connect_levels(oracle_it_i_plus_1,T_next,get_bigrade(*it_prime),get_bigrade(*it_i_plus_1));
+            std::cout << "Status of T_next after connect_levels level for step 3:" << std::endl;
+            print_T_next(T_next, true);
+        }
+
+
+        // step 4 + 5
+        std::cout << "step 4 + 5" << std::endl;
+        std::vector<bigrade_root> parents_of_iplus1; //used in step 7 to remove redundant nodes (ACTUALLY SHOULD MAKE INTO UNORDERED_SET FOR UNIQUENESS)
+        if (it_i_plus_1_exists)
+        {
+            if ((get_bigrade(*it_i_plus_1) < T_cur.bigrade) || (top_v == is_forest_connector)) // we need second condition because forest connectors are not expressed in the oracle so it has not been copied yet
+            {
+                std::map<int, Subset_map>& oracle_it_i_plus_1 = oracle[get_bigrade(*it_i_plus_1)]; // H[z_{i+1}] in paper
+                std::cout << "we must copy_upper_dendrogram"<< std::endl;
+                top_bigrade = T_cur.bigrade;
+                top_v = T_cur.r;
+                //std::map<int, Subset_map>& top_oracle = oracle[top_bigrade]; // H[z_{i+1}] in paper
+                //top_v = T_cur.r;
+                //top_v = Find(top_oracle, T_cur.r);
+                copy_upper_dendrogram(T_cur, T_next, get_bigrade(*it_i_plus_1),parents_of_iplus1, oracle_it_i_plus_1, NULL);
+
+
+                std::cout << "top_bigrade = (" << top_bigrade.first << "," << top_bigrade.second << ")" <<std::endl;
+                std::cout << "top_v = " << top_v << std::endl;
+            }
+            /*if (get_bigrade(*it_i_plus_1) == extended_bigrade)
+            {
+                std:: cout << "get_bigrade(*it_i_plus_1) == extended_bigrade" << std::endl;
+                std::cout << "there's no need to copy_upper_dendrogram" << std::endl;
+                for (auto r_ptr : T_next[extended_bigrade])
+                {
+                    int r = r_ptr.first;
+                    std::cout << "r = " << r << std::endl;
+                    auto ptr = r_ptr.second;
+                    std::cout << "*ptr = " << std::endl;
+                    Time_root::print_tr(*ptr);
+                    T_next[T_cur.bigrade][r] = ptr;
+                    ptr->bigrade = T_cur.bigrade;
+                    T_cur_root = r;
+                }
+                //T_next.erase(extended_bigrade);
+            }
+            else
+            {
+                if ((get_bigrade(*it_i_plus_1) < T_cur.bigrade) || (T_cur_root == is_forest_connector)) // we need second condition because forest connectors are not expressed in the oracle so it has not been copied yet
+                {
+                    std::map<int, Subset_map>& oracle_it_i_plus_1 = oracle[get_bigrade(*it_i_plus_1)]; // H[z_{i+1}] in paper
+                    std::cout << "we must copy_upper_dendrogram"<< std::endl;
+                    copy_upper_dendrogram(T_cur, T_next, get_bigrade(*it_i_plus_1),parents_of_iplus1, oracle_it_i_plus_1, NULL);
+                }
+            }*/
+        }
+        else
+        {
+            if (top_v == is_forest_connector)
+            {
+                std::cout << "T_cur_root == is_forest_connector" << std::endl;
+                //std::map<int, Subset_map>& oracle_it_prime = oracle[get_bigrade(*it_prime)];
+                //copy_upper_dendrogram(T_cur,T_next,get_bigrade(*it_prime),parents_of_iplus1,oracle_it_prime, NULL);
+                Time_root tr;
+                tr.r = top_v;
+                tr.bigrade = T_cur.bigrade; // does this even matter if its a forest_connector?
+                //tr.bigrade = bigrade(next_zs.back()->x,next_zs.back()->y);
+                for (auto r_ptr : T_next[get_bigrade(*it_prime)])
+                {
+                    tr.children.push_back(r_ptr.second);
+                }
+                T_next[T_cur.bigrade][is_forest_connector] = std::make_shared<Time_root>(tr);
+                top_bigrade = T_cur.bigrade;
+                //top_v = is_forest_connector;
+                std::cout << "top_bigrade = (" << top_bigrade.first << "," << top_bigrade.second << ")" <<std::endl;
+                std::cout << "top_v = " << top_v;
+
+                //T_next[tr.bigrade][is_forest_connector] = std::make_shared<Time_root>(tr);
+
+            }
+            else
+                std::cout << "there's no need to copy_upper_dendrogram" << std::endl;
+        }
+
+
+        std::cout << "Status of T_next after copy_upper_dendrogram for step 4 + 5:" << std::endl;
+        print_T_next(T_next,true);
+
+        //std::cout << "about to recursively_print_T_cur" << std::endl;
+        //std::cout << "T_cur.bigrade = (" << T_cur.bigrade.first << "," << T_cur.bigrade.second << ")" << std::endl;
+        //std::cout << "T_cur_root = " << T_cur_root << std::endl;
+        //Time_root::print_tr(*T_next[T_cur.bigrade][T_cur.r]);
+        //recursively_print_T_cur(*T_next[T_cur.bigrade][T_cur_root]);
+
+        // step 6
+        std::cout << "step 6 begin" << std::endl;
+        std::cout << "========================= next_zs:";
+        print_zeta_seq(next_zs);
+        if (it_i_minus_1_exists)
+        {
+            std::map<int, Subset_map>& oracle_i_minus_1 = oracle[get_bigrade(*it_i_minus_1)]; // H[z_i'] in paper
+            std::cout << "oracle_i_minus_1:" << std::endl;
+            //print_oracle_image(oracle_i_minus_1);
+        }
+        std::vector<bigrade> functor_bigrades;
+
+        if (it_i_plus_1_exists)
+        {
+            functor_bigrades = {get_bigrade(*it_prime),
+                                get_bigrade(*it_i_plus_1)};
+        }
+        else
+        {
+            functor_bigrades = {get_bigrade(*it_prime)};
+        }
+
+        if (it_i_minus_1_exists)
+        {
+            std::map<int, Subset_map>& oracle_it_i_minus_1 = oracle[get_bigrade(*it_i_minus_1)]; // H[z_{i-1}] in paper
+            std::cout << "about to populate_component_labels" << std::endl;
+            populate_component_labels(oracle_it_i_minus_1, T_next, get_bigrade(*it_i_minus_1));
+            std::cout << "Status of T_next after populate_component_labels for step 6: " << std::endl;
+            //print_T_next(T_next, true);
+        }
+        std::cout << "about to convert_component_to_birth_labels" << std::endl;
+        convert_component_to_birth_labels(T_next, functor_bigrades);
+        // still need to test convert_component_to_birth_labels with other examples
+        std::cout << "Status of T_next after convert_component_to_birth_labels for step 6:" << std::endl;
+        //print_T_next(T_next, true);
+
+        // step 7
+        std::cout << "parents_of_iplus1:" << std::endl;
+        for (bigrade_root big_r : parents_of_iplus1)
+        {
+            std::cout << "big = (" << big_r.first.first << "," << big_r.first.second
+                      << ") , r = " << big_r.second << std::endl;
+        }
+        for (bigrade_root big_r : parents_of_iplus1)
+        {
+            //Time_root& tr = *T_next[big_r.first][big_r.second];
+            //remove_redundant_nodes(tr,get_bigrade(*it_i_minus_1),T_next);
+            auto tr_ptr = T_next[big_r.first][big_r.second];
+            if (it_i_minus_1_exists)
+                remove_redundant_nodes(tr_ptr,get_bigrade(*it_i_minus_1),T_next);
+            else
+                remove_redundant_nodes(tr_ptr,get_bigrade(*it_prime),T_next);
+        }
+        if (parents_of_iplus1.empty())
+        {
+            std::cout << "parents_of_iplus1.empty()" << std::endl;
+            std::cout << "top_bigrade = (" << top_bigrade.first << "," << top_bigrade.second << ")" << std::endl;
+            std::cout << "T_cur_root = " << T_cur_root << std::endl;
+            std::cout << "top_v = " << top_v;
+
+            //remove_redundant_nodes(*T_next[T_cur.bigrade][T_cur.r],get_bigrade(*it_i_minus_1),T_next);
+
+            if (it_i_minus_1_exists)
+            {
+                //remove_redundant_nodes(T_next[T_cur.bigrade][T_cur_root], get_bigrade(*it_i_minus_1),T_next);
+                //remove_redundant_nodes(T_next[top_bigrade][T_cur_root], get_bigrade(*it_i_minus_1),T_next);
+                remove_redundant_nodes(T_next[top_bigrade][top_v], get_bigrade(*it_i_minus_1),T_next);
+
+            }
+            else
+            {
+                //remove_redundant_nodes(T_next[T_cur.bigrade][T_cur_root], get_bigrade(*it_prime),T_next);
+                //remove_redundant_nodes(T_next[top_bigrade][T_cur_root], get_bigrade(*it_prime),T_next);
+                remove_redundant_nodes(T_next[top_bigrade][top_v], get_bigrade(*it_prime),T_next);
+            }
+        }
+        std::cout << "Status of T_next after remove_redundant_nodes:" << std::endl;
+        //print_T_next(T_next, true);
+
+        // step 8
+        //remember that we have crossed this anchor
+        cur_anchor->toggle();
+        std::cout << "========================= cur_zs:";
+        print_zeta_seq(cur_zs);
+        std::cout << "========================= next_zs:";
+        print_zeta_seq(next_zs);
+
+        //if this cell does not yet have a dendrogram template, then store it now
+        std::shared_ptr<Face> cur_face = (path[j])->get_face();
+
+        if (!cur_face->has_been_visited())
+        {
+            std::cout << "!cur_face->has_been_visited()" << std::endl;
+            cur_face->mark_as_visited();
+            face_to_zs[cur_face] = next_zs;
+            //Time_root& tr = T_next[get_bigrade(*it_i_plus_1)].begin()->second;
+            std::cout << "T_cur.bigrade = (" << T_cur.bigrade.first << "," << T_cur.bigrade.second << ")" << std::endl;
+            std::cout << "T_cur_root = " << T_cur_root << std::endl;
+            std::cout << "top_v = " << top_v << std::endl;
+            // check to see if top node of dendrogram is redundant
+            //if (T_next[T_cur.bigrade][T_cur_root]->children.size() == 1)
+            if (T_next[top_bigrade][top_v]->children.size() == 1 &&
+                T_next[top_bigrade][top_v]->birth_label.size() == 0)
+            {
+                std::cout << "top node of dendrogram is redundant" << std::endl;
+                //cur_face->get_dendrogram() = *(T_next[T_cur.bigrade][T_cur_root]->children.front());
+                cur_face->get_dendrogram() = *(T_next[top_bigrade][top_v]->children.front());
+                top_bigrade = (T_next[top_bigrade][top_v]->children.front())->bigrade;
+                std::cout << "top_bigrade = (" << top_bigrade.first << "," << top_bigrade.second << ")" <<std::endl;
+            }
+            else
+            {
+                std::cout << "top node of dendrogram is not redundant" << std::endl;
+                //cur_face->get_dendrogram() = *T_next[T_cur.bigrade][T_cur_root];
+                cur_face->get_dendrogram() = *T_next[top_bigrade][top_v];
+            }
+
+            // populate num_leaves
+            Time_root& den_template = cur_face->get_dendrogram();
+            populate_num_leaves_and_birth_label_str(den_template);
+
+            // Testing correctness of algorithm by comparing naive vs templates
+            std::cout << " %%%%%%%%%% testing correctness of algorithm %%%%%%%%%%" << std::endl;
+
+            Time_root naive_tr = compute_dendrogram_template(next_zs);
+            Time_root template_tr = cur_face->get_dendrogram();
+
+
+
+            std::cout << "populate_ordered_component_label(naive_tr)" << std::endl;
+            populate_ordered_component_label(naive_tr);
+            std::cout << "populate_ordered_component_label(template_tr)" << std::endl;
+            populate_ordered_component_label(template_tr);
+            std::cout << "print naive_tr: " << std::endl;
+            Time_root::recursively_print_tr(naive_tr);
+            std::cout << "print template tr: " << std::endl;
+            Time_root::recursively_print_tr(template_tr);
+
+
+            bool is_isomorphic = is_dendrogram_isomorphic(naive_tr,template_tr);
+
+            std::cout << "is_isomorphic = " << is_isomorphic << std::endl;
+            if (!is_isomorphic)
+                throw std::runtime_error("dendrograms are not isomorphic!");
+        }
+
+
+        //Reset T_cur
+        std::cout << "about to reset T_cur" << std::endl;
+        //T_cur = *T_next[T_cur.bigrade][T_cur_root]; // Store T_cur as version with possibly redundant top node
+        std::cout << "top_bigrade = (" << top_bigrade.first << "," << top_bigrade.second << ")" <<std::endl;
+
+        T_cur = cur_face->get_dendrogram();
+        std::cout << "T_cur: " << std::endl;
+        Time_root::recursively_print_tr(T_cur);
+        std::cout << "about to reset cur_zs" << std::endl;
+        cur_zs = next_zs;
+        debug() << "cur_face = " << arrangement.FID(cur_face);
+    }
+
+    // restore buffer
+    //std::cout.rdbuf(orig_buf);
+}
+
+// populate num_leaves and birth_label_str
+int PersistenceUpdater::populate_num_leaves_and_birth_label_str(Time_root& tr)
+{
+    // first convert birth_label to birth_label_str
+    std::stringstream ss;
+    for (int x : tr.birth_label)
+        ss << x << ",";
+    tr.birth_label_str = ss.str();
+
+    tr.num_leaves = 0;
+    if (tr.children.size() == 0)
+    {
+        tr.num_leaves = 1;
+        return 1;
+    }
+    int new_num_leaves = 0;
+    for (auto child : tr.children)
+    {
+        new_num_leaves += populate_num_leaves_and_birth_label_str(*child);
+    }
+    tr.num_leaves = new_num_leaves;
+    return new_num_leaves;
+}
+
+void PersistenceUpdater::recursively_print_T_cur(Time_root& tr)
+{
+    Time_root::print_tr(tr, true);
+    for (auto child : tr.children)
+    {
+        recursively_print_T_cur(*child);
+    }
+    return;
+}
+
+// removes nodes with in and out degree 1 and null birth label
+void PersistenceUpdater::remove_redundant_nodes(
+        std::shared_ptr<Time_root> tr_ptr,
+        bigrade lower_cutoff,
+        boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next)
+{
+    //std::cout << " =========== remove_redundant_nodes" << std::endl;
+    //std::cout << "tr:" << std::endl;
+    Time_root& tr = *tr_ptr;
+    //Time_root::print_tr(tr,true);
+    //std::cout << "lower_cutoff: (" << lower_cutoff.first << "," << lower_cutoff.second << ")" << std::endl;
+    if (tr.bigrade < lower_cutoff || tr.children.size() == 0)
+    {
+        //std::cout << "about to return" << std::endl;
+        //std::cout << "tr.bigrade = (" << tr.bigrade.first << "," << tr.bigrade.second << ")" << std::endl;
+        //std::cout << "tr.children.size() == " << tr.children.size() << std::endl;
+        return;
+    }
+
+    std::queue<std::shared_ptr<Time_root>> unhandled_children;
+    for (int i = 0; i < tr.children.size(); i++)
+        unhandled_children.push(tr.children[i]);
+
+    while (!unhandled_children.empty())
+    {
+        auto child_ptr = unhandled_children.front();
+        unhandled_children.pop();
+        Time_root& child = *child_ptr;
+        //std::cout << "child:" << std::endl;
+        //Time_root::print_tr(child);
+        if (child.children.size() == 1 && child.birth_label.empty())
+        {
+            //std::cout << "child is redundant" << std::endl;
+            auto unique_child_of_child = child.children.front();
+            //std::cout << "unique_child_of_child:" << std::endl;
+            //Time_root::print_tr(*unique_child_of_child);
+            *child_ptr = *unique_child_of_child;
+            //std::cout << "updated tr's children:" << std::endl;
+            //Time_root::print_children(tr.children);
+            //std::cout << "T_next[tr.bigrade][tr.r].children:" << std::endl;
+            //Time_root::print_children(T_next[tr.bigrade][tr.r]->children);
+            unhandled_children.push(child_ptr);
+            //remove_redundant_nodes(child_ptr,lower_cutoff,T_next);
+        }
+        else
+        {
+            //std::cout << "child is not redundant" << std::endl;
+            remove_redundant_nodes(child_ptr, lower_cutoff, T_next);
+        }
+    }
+}
+
+/*
+// removes nodes with in and out degree 1 and null birth label
+void PersistenceUpdater::remove_redundant_nodes(
+        Time_root& tr,
+        bigrade lower_cutoff,
+        boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next)
+{
+    std::cout << " =========== remove_redundant_nodes" << std::endl;
+    std::cout << "tr:" << std::endl;
+    Time_root::print_tr(tr,true);
+    std::cout << "lower_cutoff: (" << lower_cutoff.first << "," << lower_cutoff.second << ")" << std::endl;
+    if (tr.bigrade < lower_cutoff || tr.children.size() == 0)
+    {
+        std::cout << "about to return" << std::endl;
+        std::cout << "tr.bigrade = (" << tr.bigrade.first << "," << tr.bigrade.second << ")" << std::endl;
+        std::cout << "tr.children.size() == " << tr.children.size() << std::endl;
+        return;
+    }
+    for (int i = 0; i < tr.children.size(); i++)
+    {
+        Time_root& child = *tr.children[i];
+        std::cout << "child:" << std::endl;
+        Time_root::print_tr(child);
+        if (child.children.size() == 1 && child.birth_label.empty())
+        {
+            std::cout << "child is redundant" << std::endl;
+            Time_root& unique_child_of_child = *(child.children.front());
+            std::cout << "unique_child_of_child:" << std::endl;
+            Time_root::print_tr(unique_child_of_child);
+            tr.children[i] = std::make_shared<Time_root>(unique_child_of_child); // check that this doesn't change the original child
+            std::cout << "updated tr's children:" << std::endl;
+            Time_root::print_children(tr.children);
+            std::cout << "T_next[tr.bigrade][tr.r].children:" << std::endl;
+            Time_root::print_children(T_next[tr.bigrade][tr.r]->children);
+
+            remove_redundant_nodes(unique_child_of_child,lower_cutoff,T_next);
+        }
+        else
+            remove_redundant_nodes(child, lower_cutoff,T_next);
+    }
+}*/
+
+// convert component labels to birth_labels
+void PersistenceUpdater::convert_component_to_birth_labels(
+        boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+        std::vector<bigrade> functor_bigrades)
+{
+    //std::cout << "convert_component_to_birth_label" << std::endl;
+    //std::cout << "############# beginning status of T_next:" << std::endl;
+    //print_T_next(T_next,true);
+    for (bigrade big: functor_bigrades)
+    {
+        for (auto& r_tr : T_next[big])
+        {
+            Time_root& tr = *r_tr.second;
+            //std::cout << "tr:" << std::endl;
+            //Time_root::print_tr(tr,true);
+            for (int v : tr.component_label)
+            {
+                tr.birth_label.insert(v);
+            }
+            //tr.birth_label = tr.component_label;
+        }
+    }
+    //std::cout << "############# middle status of T_next:" << std::endl;
+    //print_T_next(T_next,true);
+    //std::cout << "############# begin conversion" << std::endl;
+    for (bigrade big: functor_bigrades)
+    {
+        for (auto& r_tr : T_next[big])
+        {
+            Time_root& tr = *r_tr.second;
+            std::cout << "tr:" << std::endl;
+            Time_root::print_tr(tr,true);
+            for (std::shared_ptr<Time_root> child : tr.children)
+            {
+                std::cout << "child:" << std::endl;
+                Time_root::print_tr(*child,true);
+                std::cout << "component_label:";
+                for (int v : child->component_label)
+                {
+                    std::cout << v << ",";
+                    tr.birth_label.erase(v);
+                }
+              /*std::stringstream ss;
+                for (int x : tr.birth_label)
+                    ss << x << ",";
+                tr.birth_label_str = ss.str();
+                std::cout << std::endl;*/
+            }
+        }
+    }
+    //std::cout << "############# end status of T_next:" << std::endl;
+    //print_T_next(T_next,true);
+}
+
+// copy upper part of T_cur
+void PersistenceUpdater::copy_upper_dendrogram(Time_root& tr,
+                                               boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                                               bigrade big_i_plus_1,
+                                               std::vector<bigrade_root>& parents_of_iplus1,
+                                               std::map<int, Subset_map>& oracle,
+                                               std::shared_ptr<Time_root> parent_ptr)
+{
+    //std::cout << "copy_upper_dendrogram" << std::endl;
+    //std::cout << "tr:" << std::endl;
+    //Time_root::print_tr(tr, true);
+    //std::cout << "children: " << std::endl;
+    //Time_root::print_children(tr.children, true);
+    //std::cout << "big_i_plus_1: (" << big_i_plus_1.first << "," << big_i_plus_1.second << ")" << std::endl;
+
+    std::shared_ptr<Time_root> tr_copy_ptr = std::make_shared<Time_root>(tr);
+    Time_root& tr_copy = *tr_copy_ptr;
+
+    if (tr.bigrade < big_i_plus_1)
+    {
+        std::cout << "about to return" << std::endl;
+        if (parent_ptr != NULL)
+        {
+            int h_r = Find(oracle, tr.r);
+            //std::cout << "must update parent_ptr's children before returning" << std::endl;
+            //std::cout << "*T_next[(" << big_i_plus_1.first << "," << big_i_plus_1.second << ")][" << h_r << "] = " << std::endl;
+            Time_root::print_tr(*T_next[big_i_plus_1][h_r]);
+            (*parent_ptr).children.push_back(T_next[big_i_plus_1][h_r]);
+        }
+        return; // is this return condition even the right one?
+    }
+    //Time_root tr_copy = tr;
+
+    //std::cout << "tr_copy:" << std::endl;
+    //Time_root::print_tr(tr_copy);
+    tr_copy.children.clear();
+    //std::cout << "tr_copy.children: " << std::endl;
+    //Time_root::print_children(tr_copy.children);
+    std::unordered_set<int> type_U_seen; // need because children of type U may have merged before i+1
+    for (std::shared_ptr<Time_root> child_ptr : tr.children)
+    {
+        Time_root& child = *child_ptr;
+        //std::cout << "child: " << std::endl;
+        //Time_root::print_tr(child);
+        bool child_is_at_cutoff = (child.bigrade == big_i_plus_1 ||
+                                  (tr.bigrade > big_i_plus_1 && child.bigrade < big_i_plus_1));
+        // child_is_at_cutoff iff child \in V(U) \cup V(i+1)
+        if (child_is_at_cutoff)
+        {
+            //Time_root& child_twin = *T_next[child.bigrade][child.r]; //child_twin represents the same node in the functor dendrogram of T^f, image of child under XY in paper
+            parents_of_iplus1.push_back(bigrade_root(tr.bigrade,tr.r));
+            if (child.bigrade == big_i_plus_1)
+            {
+                //std::cout << "child is type i + 1" << std::endl;
+                int h_r = Find(oracle, child.r);
+                //std::cout << "h_r = " << h_r << std::endl;
+                /*std::cout << "T_next[child.bigrade][child.r] = "
+                          << "T_next[(" << child.bigrade.first << ","
+                          << child.bigrade.second << ")]["
+                          << h_r << "] = " << std::endl;
+                Time_root::print_tr(*T_next[child.bigrade][h_r]);
+                std::cout << "able to print_tr" << std::endl;*/
+                tr_copy.children.push_back(T_next[child.bigrade][h_r]);
+            }
+            else
+            {
+                //std::cout << "child is type U" << std::endl;
+                int h_r = Find(oracle, child.r);
+                //std::cout << "h_r = " << h_r << std::endl;
+                if (type_U_seen.find(h_r) == type_U_seen.end())
+                {
+                    tr_copy.children.push_back(T_next[big_i_plus_1][h_r]);
+                    type_U_seen.insert(h_r);
+                }
+            }
+
+        }
+        else
+        {
+            //Time_root child_copy = child;
+            std::shared_ptr<Time_root> child_copy_ptr = std::make_shared<Time_root>(child);
+            //std::shared_ptr<Time_root> child_copy_ptr = std::make_shared<Time_root> (child_copy);
+            //tr_copy.children.push_back(child_copy_ptr);
+            copy_upper_dendrogram(*child_copy_ptr, T_next, big_i_plus_1, parents_of_iplus1, oracle, tr_copy_ptr);
+        }
+    }
+    if (parent_ptr != NULL)
+        (*parent_ptr).children.push_back(tr_copy_ptr);
+    //std::cout << "about to assign T_next[(" << tr.bigrade.first << "," << tr.bigrade.second << ")][" << tr.r << "] = tr_copy_ptr" << std::endl;
+    //T_next[tr.bigrade][tr.r] = std::make_shared<Time_root>(tr_copy);
+    T_next[tr.bigrade][tr.r] = tr_copy_ptr;
+    /*std::cout << "*tr_copy_ptr = " << std::endl;
+    Time_root::print_tr(*tr_copy_ptr);
+    std::cout << "*tr_copy_ptr.children = " << std::endl;
+    Time_root::print_children((*tr_copy_ptr).children);
+    std::cout << "sucessfully printed_children" << std::endl;*/
+
+}
+
+// connect different levels (big_1 and big_2) of T_next
+void PersistenceUpdater::connect_levels(std::map<int, Subset_map>& oracle,
+                                        boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                                        bigrade big_1,
+                                        bigrade big_2)
+{
+    for (auto& v_tr : T_next[big_1])
+    {
+        int v = v_tr.first;
+        Time_root& tr_1 = *v_tr.second;
+        int h_v = Find(oracle,v);
+        Time_root& tr_2 = *T_next[big_2][h_v];
+        tr_2.children.push_back(v_tr.second);
+    }
+}
+
+// instantiate a level (at the given bigrade) of T_next
+void PersistenceUpdater::instantiate_level(std::map<int, Subset_map>& oracle,
+                                           boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                                           std::pair<unsigned,unsigned> big)
+{
+    // can optimize this part by remembering another table "oracle_heads" to remember the heads
+    std::unordered_set<int> heads_with_tr;
+    for (auto kv : oracle)
+    {
+        int v = kv.first;
+        int h_v = Find(oracle, v); //head of v (r_v in paper)
+
+        if (heads_with_tr.find(h_v) == heads_with_tr.end())
+        {
+            heads_with_tr.insert(h_v);
+            Time_root tr_h_v;
+            tr_h_v.bigrade = big;
+            tr_h_v.r = h_v;
+            //T_next[bigrade_root(bigrade,h_v)] = tr_h_v;
+            T_next[big][h_v] = std::make_shared<Time_root>(tr_h_v);
+        }
+        //T_next[bigrade_root(bigrade,h_v)].component_label.insert(v);
+        T_next[big][h_v]->component_label.insert(v);
+    }
+}
+
+// populate component labels of a level (at the given bigrade) in T_next
+void PersistenceUpdater::populate_component_labels(std::map<int, Subset_map>& oracle,
+                                                   boost::unordered::unordered_map<bigrade,boost::unordered::unordered_map<int, std::shared_ptr<Time_root>>>& T_next,
+                                                   bigrade big)
+{
+    for (auto kv : oracle)
+    {
+        int v = kv.first;
+        std::cout << "big = (" << big.first << "," << big.second << ")" << std::endl;
+        std::cout << "v = " << v << std::endl;
+        int h_v = Find(oracle, v); //head of v (r_v in paper)
+        std::cout << "h_v = " << h_v << std::endl;
+        T_next[big][h_v]->component_label.insert(v);
+    }
+}
+
+//get bigrade from TemplatePointsMatrixEntry
+std::pair<unsigned,unsigned> PersistenceUpdater::get_bigrade(std::shared_ptr<TemplatePointsMatrixEntry> u)
+{
+    return std::pair<unsigned,unsigned>(u->x,u->y);
+}
+
+//set oracle
+void PersistenceUpdater::set_oracle(boost::unordered::unordered_map<std::pair<int,int>,std::map<int, Subset_map>>& ora)
+{
+    oracle = ora;
+}
+
+void PersistenceUpdater::set_cs(computing_s* comp_s)
+{
+    cs = comp_s;
+}
+
+//classify nodes of dendrogram during updates
+void PersistenceUpdater::classify_nodes(std::vector<Time_root>& L,
+                                        std::vector<Time_root>& i_minus_1,
+                                        std::vector<Time_root>& i_plus_1,
+                                        std::vector<Time_root>& U,
+                                        Time_root& tr,
+                                        std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_prime,
+                                        bool it_i_minus_1_exists,
+                                        bool it_i_plus_1_exists)
+{
+    //std::cout << ">>>>>>>>>>>>>>> classify_nodes" << std::endl;
+    std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_i_minus_1;
+    if (it_i_minus_1_exists)
+    {
+        it_i_minus_1 = std::prev(it_prime,1);
+        //std::cout << "it_i_minus_1 : ";
+        //print_iterator(it_i_minus_1);
+    }
+    std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it_i_plus_1;
+    if (it_i_plus_1_exists)
+    {
+        it_i_plus_1 = std::next(it_prime,1);
+        //std::cout << "it_i_plus_1 : ";
+        //print_iterator(it_i_plus_1);
+    }
+
+    //std::cout << "classify_nodes 2" << std::endl;
+    //std::cout << "tr : " << std::endl;
+    //Time_root::print_tr(tr);
+    //Time_root::print_children(tr.children);
+    if (tr.children.size() == 0)
+        return;
+    for (std::shared_ptr<Time_root> child_ptr : tr.children)
+    {
+        Time_root& child = *child_ptr;
+        if (it_i_plus_1_exists)
+        {
+            if (child.bigrade == get_bigrade(*it_i_plus_1))
+                i_plus_1.push_back(child);
+            if (tr.bigrade > get_bigrade(*it_i_plus_1) && child.bigrade < get_bigrade(*it_i_plus_1))
+                U.push_back(child);
+        }
+        if (it_i_minus_1_exists)
+        {
+            //std::cout << "reached classification of i_minus_1 and L" << std::endl;
+            //std::cout << "child : " << std::endl;
+            //Time_root::print_tr(child);
+            if (child.bigrade == get_bigrade(*it_i_minus_1))
+                i_minus_1.push_back(child);
+            if (tr.bigrade > get_bigrade(*it_i_minus_1) && child.bigrade < get_bigrade(*it_i_minus_1))
+                L.push_back(child);
+        }
+        classify_nodes(L,i_minus_1,i_plus_1,U,child,it_prime,it_i_minus_1_exists,it_i_plus_1_exists);
+    }
+}
+
+//stores a dendrogram template in a 2-cell of the arrangement
+void PersistenceUpdater::store_initial_dendrogram_template(std::shared_ptr<Face> cell, zeta_seq& zs)
+{
+    //mark this cell as visited
+
+    cell->mark_as_visited();
+
+    Time_root& tr = cell->get_dendrogram();
+
+    // 1-critical version SimplexSet vertices = bifiltration.get_ordered_simplices();
+    // 1-critical version SimplexSet edges = bifiltration.get_ordered_high_simplices();
+    boost::unordered::unordered_map<unsigned, double> vertex_appearance;
+    boost::unordered::unordered_map<unsigned, std::pair<double,double>> vertex_bigrade;
+    boost::unordered::unordered_map<double, std::pair<double,double>> appearance_to_bigrade; // map from time of appearance to point in zeta seq
+
+    SimplexInfo* vertices_to_grades = bifiltration_data.getSimplices(0);
+    SimplexInfo* edges_to_grades = bifiltration_data.getSimplices(1);
+
+    for (auto vertexVec_grade : *vertices_to_grades)
+    {
+        unsigned v = vertexVec_grade.first[0];
+        AppearanceGrades grades = vertexVec_grade.second;
+        for (Grade g : grades)
+        {
+            double birth = g.y;
+            std::pair<double,double> big (g.x,g.y);
+            debug() << "(v,x,y,birth) = (" <<
+                    v << " , " <<
+                    g.x << " , " <<
+                    g.y << " , " <<
+                    birth << ")";
+            if (vertex_appearance.find(v) == vertex_appearance.end())
+            {
+                vertex_appearance[v] = birth;
+                vertex_bigrade[v] = big;
+            }
+            else
+            {
+                if (birth < vertex_appearance[v])
+                {
+                    vertex_appearance[v] = birth;
+                    vertex_bigrade[v] = big;
+                }
+            }
+        }
+    }
+
+    for (auto entry : zs)
+    {
+        appearance_to_bigrade[entry->y] = std::pair<double,double>(entry->x,entry->y);
+    }
+
+    /* 1-critical version
+    for (auto st_node : vertices)
+    {
+        unsigned v = st_node->get_vertex();
+        double x = st_node->grade_x();
+        double y = st_node->grade_y();
+        double birth = y;
+        std::pair<double,double> bigrade (x,y);
+
+        /*
+        debug() << "(v,x,y,birth) = (" <<
+                v << " , " <<
+                x << " , " <<
+                y << " , " <<
+                birth << ")";
+        if (vertex_appearance.find(v) == vertex_appearance.end())
+        {
+            vertex_appearance[v] = birth;
+            vertex_bigrade[v] = bigrade;
+        }
+        else
+        {
+            if (birth < vertex_appearance[v])
+            {
+                vertex_appearance[v] = birth;
+                vertex_bigrade[v] = bigrade;
+            }
+        }
+    }*/
+
+    boost::unordered::unordered_map<std::pair<unsigned,unsigned>, double> edge_appearance;
+    boost::unordered::unordered_map<std::pair<unsigned,unsigned>, std::pair<double,double>> edge_bigrade;
+
+    for (auto edgeVec_grade : *edges_to_grades)
+    {
+        std::vector<int> edge_vector = edgeVec_grade.first;
+        AppearanceGrades grades = edgeVec_grade.second;
+        std::pair<unsigned,unsigned> edge (edge_vector[0], edge_vector[1]);
+        for (Grade g : grades)
+        {
+            double birth = g.y;
+            std::pair<double,double> big (g.x,g.y);
+            if (edge_appearance.find(edge) == edge_appearance.end())
+            {
+                edge_appearance[edge] = birth;
+                edge_bigrade[edge] = big;
+            }
+            else
+            {
+                if (birth < edge_appearance[edge])
+                {
+                    edge_appearance[edge] = birth;
+                    edge_bigrade[edge] = big;
+                }
+            }
+        }
+    }
+
+    /* 1-critical version
+    for (auto st_node : edges)
+    {
+        int global_index = st_node->global_index();
+        std::vector<int> edge_vector = bifiltration.find_vertices(global_index);
+        std::pair<unsigned,unsigned> edge (edge_vector[0], edge_vector[1]);
+        double x = st_node->grade_x();
+        double y = st_node->grade_y();
+        double birth = y;
+
+        // case where edge does not live in T_1 \subset S
+        if (appearance_to_bigrade.find(birth) == appearance_to_bigrade.end())
+        {
+            continue;
+        }
+        std::pair<double,double> bigrade (x,y);
+
+        if (edge_appearance.find(edge) == edge_appearance.end())
+        {
+            edge_appearance[edge] = birth;
+            edge_bigrade[edge] = bigrade;
+        }
+        else
+        {
+            if (birth < edge_appearance[edge])
+            {
+                edge_appearance[edge] = birth;
+                edge_bigrade[edge] = bigrade;
+            }
+        }
+    }*/
+
+    DenseGRAPH<Edge>* graph = new DenseGRAPH<Edge>(vertex_appearance.size(), true);
+    debug() << "print edges of graph";
+    for (auto edge_wt : edge_appearance)
+    {
+        std::pair<unsigned,unsigned> e = edge_wt.first;
+        unsigned v = e.first;
+        unsigned w = e.second;
+        graph-> insert(EdgePtr( new Edge(v,w,edge_wt.second,edge_bigrade[e])));
+        /*debug() << "(v,w,edge_wt,edge_bigrade) = (" <<
+                   v << " , " <<
+                   w << " , " <<
+                   edge_wt.second << " , (" <<
+                   edge_bigrade[e].first << " , " << edge_bigrade[e].second << "))";*/
+
+    }
+
+    std::vector<EdgePtr> mst;
+    boost::unordered::unordered_map<std::pair<double,int>, Time_root> time_root_to_tr;
+
+    debug() << "START store_initial_dendrogram_template";
+    std::vector<Time_root> upper_trs;
+    Dendrogram_data::compute_dendrogram(graph, mst, time_root_to_tr, tr, vertex_appearance, vertex_bigrade, appearance_to_bigrade, upper_trs);
+    debug() << "upper_trs: ";
+    //Time_root::print_trs(upper_trs, true);
+    for ( std::vector<EdgePtr>::const_iterator it = mst.begin(); it != mst.end(); ++it )
+    {
+        /*
+        debug() << it->get()->v << " "
+                << it->get()->w << " "
+                << it->get()->wt << "\n";*/
+    }
+    if (upper_trs.size() > 1)
+    {
+        Time_root forest_connector;
+        forest_connector.r = is_forest_connector;
+        forest_connector.bigrade = bigrade(UINT_MAX,UINT_MAX);
+        for (Time_root& upper_tr : upper_trs)
+        {
+            forest_connector.children.push_back(std::make_shared<Time_root>(upper_tr));
+            forest_connector.num_leaves += upper_tr.num_leaves;
+        }
+        tr = forest_connector;
+        std::cout << "forest_connector : " << std::endl;
+        Time_root::print_tr(forest_connector);
+        Time_root::print_children(forest_connector.children);
+    }
+    else // upper_trs.size() == 1
+        tr = upper_trs.front();
+
+    debug() << "END store_initial_dendrogram_template";
+    for (auto t_big : appearance_to_bigrade)
+    {
+        auto t = t_big.first;
+        auto big = t_big.second;
+        /*
+        std::cout << "t = " << t << " , " << "big = ("
+                  << big.first << "," << big.second << ")"
+                  << std::endl;*/
+    }
+    return;
+
+}
+
+
 
 //computes and stores a barcode template in each 2-cell of arrangement
 //resets the matrices and does a standard persistence calculation for expensive crossings
@@ -215,7 +1953,8 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
                 merge_grade_lists(at_anchor, down); //move all grades from down to anchor
                 add_lift_entries(at_anchor); //this block of the partition might have previously been empty
                 add_lift_entries(left); //this block of the partition moved
-            } else //then anchor is crossed from above to below
+            }
+            else //then anchor is crossed from above to below
             {
                 remove_lift_entries(at_anchor); //this block of the partition might become empty
                 remove_lift_entries(left); //this block of the partition will move
@@ -234,7 +1973,8 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
                 add_lift_entries(at_anchor); //this block of the partition might have previously been empty
                 add_lift_entries(down); //this block of the partition moved
             }
-        } else //this is a non-strict anchor, and we just have to split or merge equivalence classes
+        }
+        else //this is a non-strict anchor, and we just have to split or merge equivalence classes
         {
             if (verbosity >= 6) {
                 debug() << "  step " << i << " of path: crossing (non-strict) anchor at (" << cur_anchor->get_x() << ", " << cur_anchor->get_y() << ") into cell " << arrangement.FID((path[i])->get_face()) << "; edge weight: " << cur_anchor->get_weight();
@@ -346,6 +2086,29 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
     delete U_high;
 
 } //end store_barcodes_with_reset()
+
+//function to set all edge weights to uniform value for dendrogram testing
+void PersistenceUpdater::set_uniform_anchor_weights(std::vector<std::shared_ptr<Halfedge>>& path)
+{
+    for (unsigned i = 0; i < path.size(); i++)
+    {
+        //determine which anchor is represented by this edge
+        std::shared_ptr<Anchor> cur_anchor = (path[i])->get_anchor();
+        //std::shared_ptr<TemplatePointsMatrixEntry> at_anchor = cur_anchor->get_entry();
+
+        if (verbosity >= 8) {
+            debug() << "  step" << i << "of the short path: crossing anchor at (" << cur_anchor->get_x() << "," << cur_anchor->get_y() << ") into cell" << arrangement.FID((path[i])->get_face());
+        }
+
+        //store data
+        cur_anchor->set_weight(1); //we expect that each separation produces a transposition about 25% of the time
+
+        if (verbosity >= 8) {
+            debug() << "     edge weight:" << cur_anchor->get_weight();
+        }
+    }
+}
+
 
 //function to set the "edge weights" for each anchor line
 void PersistenceUpdater::set_anchor_weights(std::vector<std::shared_ptr<Halfedge>>& path)

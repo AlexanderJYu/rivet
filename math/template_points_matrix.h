@@ -89,7 +89,8 @@ public:
     std::shared_ptr<TemplatePointsMatrixEntry> get_row(unsigned r); //gets a pointer to the rightmost entry in row r; returns NULL if row r is empty
     std::shared_ptr<TemplatePointsMatrixEntry> get_col(unsigned c); //gets a pointer to the top entry in column c; returns NULL if column c is empty
 
-    unsigned height(); //retuns the number of rows;
+    unsigned height(); //returns the number of rows;
+    unsigned width(); //returns the number of cols;
 
     void clear_grade_lists(); //clears the level set lists for all entries in the matrix
 

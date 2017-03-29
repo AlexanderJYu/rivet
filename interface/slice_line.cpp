@@ -41,6 +41,19 @@ SliceLine::SliceLine(SliceDiagram* sd, ConfigParameters* params)
     setPos(0, 0);
 }
 
+// Dendrogram constructor
+SliceLine::SliceLine(QNEMainWindow* mw, ConfigParameters *params) :
+    vertical(false), pressed(false), rotating(false), update_lock(false),
+    right_point(0,0),
+    mwin(mw),
+    config_params(params),
+    dendrogram_mode(true)
+{
+    setFlag(ItemIsMovable);
+    setFlag(ItemSendsGeometryChanges);
+    setPos(0,0);
+}
+
 void SliceLine::setDots(ControlDot* left, ControlDot* right)
 {
     left_dot = left;
@@ -86,12 +99,15 @@ QVariant SliceLine::itemChange(GraphicsItemChange change, const QVariant& value)
         if (vertical) //handle vertical lines
         {
             //set newpos to keep left endpoint on bottom edge of box
-            if (mouse.x() < 0)
-                newpos.setX(0);
+            //if (mouse.x() < 0)
+                //newpos.setX(0);
+            if (mouse.x() < data_xmin)
+                newpos.setX(data_xmin);
             else if (mouse.x() > data_xmax)
                 newpos.setX(data_xmax);
             else
                 newpos.setX(mouse.x());
+            //newpos.setX(mouse.x());
 
             newpos.setY(0);
 
@@ -140,7 +156,10 @@ QVariant SliceLine::itemChange(GraphicsItemChange change, const QVariant& value)
         right_dot->set_position(newpos + right_point);
 
         //update ui control objects
-        sdgm->update_window_controls(false);
+        if (dendrogram_mode)
+            mwin->update_window_controls();
+        else
+            sdgm->update_window_controls(false);
 
         return newpos;
     }
@@ -170,7 +189,10 @@ void SliceLine::update_lb_endpoint(QPointF& newpos)
     prepareGeometryChange();
 
     //update ui control objects
-    sdgm->update_window_controls(true);
+    if (dendrogram_mode)
+        mwin->update_window_controls();
+    else
+        sdgm->update_window_controls(true);
 
     update_lock = false;
 }
@@ -195,7 +217,10 @@ void SliceLine::update_rt_endpoint(QPointF& newpos)
     prepareGeometryChange();
 
     //update ui control objects
-    sdgm->update_window_controls(true);
+    if (dendrogram_mode)
+        mwin->update_window_controls();
+    else
+        sdgm->update_window_controls(true);
 
     update_lock = false;
 }
@@ -226,13 +251,14 @@ bool SliceLine::is_vertical()
 }
 
 //udpates the dimensions of the on-screen box in which this line is allowed to move
-void SliceLine::update_bounds(double data_width, double data_height, int padding)
+void SliceLine::update_bounds(double data_width, double data_height, int padding, double xmin)
 {
     update_lock = true;
 
-    data_xmax = data_width + padding / 2;
+    data_xmin = xmin;
+    data_xmax = data_xmin + data_width + padding / 2;
     data_ymax = data_height + padding / 2;
-    box_xmax = data_width + padding;
+    box_xmax = data_xmin + data_width + padding;
     box_ymax = data_height + padding;
 
     update_lock = false;
@@ -293,6 +319,7 @@ void SliceLine::mouseReleaseEvent(QGraphicsSceneMouseEvent* event)
     prepareGeometryChange();
 
     QGraphicsItem::mouseReleaseEvent(event);
+    emit slice_line_released();
 }
 
 //right-click and drag to change slope, left/bottom endpoint stays fixed
@@ -320,7 +347,10 @@ void SliceLine::mouseMoveEvent(QGraphicsSceneMouseEvent* event)
         prepareGeometryChange();
 
         //update ui control objects
-        sdgm->update_window_controls(false);
+        if (dendrogram_mode)
+            mwin->update_window_controls();
+        else
+            sdgm->update_window_controls(true);
     }
 
     QGraphicsItem::mouseMoveEvent(event);

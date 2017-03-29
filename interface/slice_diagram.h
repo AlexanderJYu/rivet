@@ -77,6 +77,10 @@ public:
     double get_pd_scale(); //gets the number of pixels per unit, for the persistence diagram
 
     void receive_parameter_change(const QString& xtext, const QString& ytext); //updates the diagram after a change in configuration parameters
+    ControlDot* get_dot_right() { return dot_right; }
+    ControlDot* get_dot_left() { return dot_left; }
+    SliceLine* get_slice_line() { return slice_line; }
+
 
 public slots:
     void receive_bar_selection(std::vector<unsigned> indexes); //highlight the specified class of bars, which has been selected externally
@@ -87,6 +91,7 @@ signals:
     void set_line_control_elements(double angle, double offset); //sends updates to, e.g., the VisualizationWindow
     void persistence_bar_selected(unsigned index); //triggered when the user selects a bar in the barcode
     void persistence_bar_deselected(); //triggered when the user deselects a bar in the barcode
+
 
 private:
     //parameters

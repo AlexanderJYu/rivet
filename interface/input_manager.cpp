@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "input_manager.h"
 #include "../computation.h"
+#include "../math/simplex_tree.h"
 #include "../math/bifiltration_data.h"
 #include "file_input_reader.h"
 #include "input_parameters.h"
@@ -133,9 +134,6 @@ FileType& InputManager::get_file_type(std::string fileName)
         throw std::runtime_error("Could not open " + fileName);
     }
     FileInputReader reader(stream);
-    if (!reader.has_next_line()) {
-        throw std::runtime_error("Empty file: " + fileName);
-    }
     std::string filetype_name = reader.next_line().first[0];
 
     auto it = std::find_if(supported_types.begin(), supported_types.end(), [filetype_name](FileType t) { return t.identifier == filetype_name; });
@@ -154,7 +152,10 @@ std::unique_ptr<InputData> InputManager::start(Progress& progress)
 {
     //read the file
     if (verbosity >= 2) {
-        debug() << "READING FILE:" << input_params.fileName;
+        std::ostringstream oss;
+        oss << "READING FILE:" << input_params.fileName;
+        //debug() << "READING FILE:" << input_params.fileName;
+        debug() << oss.str().c_str();
     }
     auto file_type = get_file_type(input_params.fileName);
     std::ifstream infile(input_params.fileName); //input file
@@ -202,7 +203,7 @@ std::unique_ptr<InputData> InputManager::read_point_cloud_VR(std::ifstream& stre
                        " There may be a problem with your input file.  ";
         }
         if (verbosity >= 4) {
-            debug() << "  Point cloud lives in dimension:" << dimension_line[0];
+            debug() << "  Point cloud lives in dimension:" << dimension_line[0].c_str();
         }
 
         int dim = std::stoi(dimension_line[0]);
@@ -226,7 +227,7 @@ std::unique_ptr<InputData> InputManager::read_point_cloud_VR(std::ifstream& stre
         if (verbosity >= 4) {
             std::ostringstream oss;
             oss << max_dist;
-            debug() << "  Maximum distance of edges in Vietoris-Rips complex:" << oss.str();
+            debug() << "  Maximum distance of edges in Vietoris-Rips complex:" << oss.str().c_str();
         }
 
         //read label for x-axis
@@ -395,7 +396,7 @@ std::unique_ptr<InputData> InputManager::read_point_cloud_BR(std::ifstream& stre
                        " There may be a problem with your input file.  ";
         }
         if (verbosity >= 4) {
-            debug() << "  Point cloud lives in dimension:" << dimension_line[0];
+            debug() << "  Point cloud lives in dimension:" << dimension_line[0].c_str();
         }
 
         int dim = std::stoi(dimension_line[0]);
@@ -419,7 +420,7 @@ std::unique_ptr<InputData> InputManager::read_point_cloud_BR(std::ifstream& stre
         if (verbosity >= 4) {
             std::ostringstream oss;
             oss << max_dist;
-            debug() << "  Maximum distance of edges in Bifiltration-Rips complex:" << oss.str();
+            debug() << "  Maximum distance of edges in Bifiltration-Rips complex:" << oss.str().c_str();
         }
 
         //set label for x-axis to "degree"
@@ -613,7 +614,7 @@ std::unique_ptr<InputData> InputManager::read_discrete_metric_space(std::ifstrea
         if (verbosity >= 4) {
             std::ostringstream oss;
             oss << max_dist;
-            debug() << "  Maximum distance of edges in Vietoris-Rips complex:" << oss.str();
+            debug() << "  Maximum distance of edges in Vietoris-Rips complex:" << oss.str().c_str();
         }
 
         std::pair<ExactSet::iterator, bool> ret; //for return value upon insert()
@@ -641,7 +642,7 @@ std::unique_ptr<InputData> InputManager::read_discrete_metric_space(std::ifstrea
                                 + "and" + std::to_string(j));
 
                         std::string str = tokens.next_token();
-                        debug() << str;
+                        debug() << str.c_str();
 
                         exact cur_dist = str_to_exact(str);
 
@@ -835,23 +836,23 @@ std::unique_ptr<InputData> InputManager::read_brips(std::ifstream& stream, Progr
             }
 
             //read vertices
-            unsigned pos = 0;
+            unsigned dim = 0;
             std::vector<int> verts;
-            while(tokens[pos].at(0) != ';') {
-                int v = std::stoi(tokens[pos]);
+            while(tokens[dim].at(0) != ';') {
+                int v = std::stoi(tokens[dim]);
                 verts.push_back(v);
-                pos++;
+                dim++;
             }
-            pos++;
-            unsigned grades = (tokens.size() - pos) / 2; //remaining tokens are xy pairs
+
+            unsigned grades = (tokens.size() - dim) / 2; //remaining tokens are xy pairs
+
             for (unsigned i = 0; i < grades; i++) {
                 //read multigrade and remember that it corresponds to this grade
-                ret = x_set.insert(new ExactValue(str_to_exact(tokens.at(pos))));
+                ret = x_set.insert(new ExactValue(str_to_exact(tokens.at(dim + 1))));
                 (*(ret.first))->indexes.push_back(num_grades);
-                ret = y_set.insert(new ExactValue(str_to_exact(tokens.at(pos + 1))));
+                ret = y_set.insert(new ExactValue(str_to_exact(tokens.at(dim + 2))));
                 (*(ret.first))->indexes.push_back(num_grades);
                 num_grades++;
-                pos += 2;
             }
 
             simplexList.push_back({verts, grades});
@@ -883,10 +884,6 @@ std::unique_ptr<InputData> InputManager::read_brips(std::ifstream& stream, Progr
         }
         data->bifiltration_data->add_simplex(it->first, gradesOfApp);
     }
-    if (verbosity >= 10)
-    {
-        data->bifiltration_data->print_bifiltration();
-    }
     data->bifiltration_data->createGradeInfo();
     data->bifiltration_data->set_xy_grades(data->x_exact.size(), data->y_exact.size());
 
@@ -911,7 +908,7 @@ std::unique_ptr<InputData> InputManager::read_RIVET_data(std::ifstream& stream, 
     //read parameters
     auto line_info = reader.next_line();
     auto line = line_info.first;
-    debug() << join(line);
+    debug() << join(line).c_str();
     line_info = reader.next_line();
     try {
         input_params.dim = std::stoi(line_info.first[0]);

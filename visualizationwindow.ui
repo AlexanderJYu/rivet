@@ -15,8 +15,41 @@
   </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QGridLayout" name="gridLayout_3">
-    <item row="0" column="0">
+    <item row="1" column="0">
      <layout class="QGridLayout" name="gridLayout_main">
+      <item row="0" column="0">
+       <widget class="QLabel" name="sliceLabel">
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <pointsize>14</pointsize>
+          <weight>75</weight>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>Line Selection Window</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QGraphicsView" name="sliceView">
+        <property name="verticalScrollBarPolicy">
+         <enum>Qt::ScrollBarAsNeeded</enum>
+        </property>
+        <property name="horizontalScrollBarPolicy">
+         <enum>Qt::ScrollBarAsNeeded</enum>
+        </property>
+       </widget>
+      </item>
       <item row="2" column="0">
        <layout class="QHBoxLayout" name="horizontalLayout_controls">
         <item>
@@ -320,93 +353,93 @@
         </item>
        </layout>
       </item>
-      <item row="0" column="0">
-       <widget class="QLabel" name="sliceLabel">
-        <property name="minimumSize">
-         <size>
-          <width>0</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>14</pointsize>
-          <weight>75</weight>
-          <bold>true</bold>
-         </font>
-        </property>
-        <property name="text">
-         <string>Line Selection Window</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item row="0" column="1">
-       <widget class="QLabel" name="pdLabel">
-        <property name="minimumSize">
-         <size>
-          <width>0</width>
-          <height>0</height>
-         </size>
-        </property>
-        <property name="font">
-         <font>
-          <pointsize>14</pointsize>
-          <weight>75</weight>
-          <bold>true</bold>
-         </font>
-        </property>
-        <property name="text">
-         <string>Persistence Diagram</string>
-        </property>
-        <property name="alignment">
-         <set>Qt::AlignCenter</set>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QGraphicsView" name="pdView"/>
-      </item>
       <item row="2" column="1">
        <layout class="QHBoxLayout" name="horizontalLayout_pd_controls">
         <item>
-         <spacer name="horizontalSpacer_4">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+         <widget class="QLabel" name="xposLabel">
+          <property name="text">
+           <string>x-pos:</string>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
           </property>
-         </spacer>
+         </widget>
         </item>
         <item>
-         <spacer name="horizontalSpacer_5">
+         <widget class="QDoubleSpinBox" name="xposBox">
+          <property name="minimum">
+           <double>-99.989999999999995</double>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line_4">
           <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+           <enum>Qt::Vertical</enum>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>40</width>
-            <height>20</height>
-           </size>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="clusterLabel_2">
+          <property name="text">
+           <string>Cluster:</string>
           </property>
-         </spacer>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="clusterText">
+          <property name="text">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line_3">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
-      <item row="1" column="0">
-       <widget class="QGraphicsView" name="sliceView">
-        <property name="verticalScrollBarPolicy">
-         <enum>Qt::ScrollBarAsNeeded</enum>
+      <item row="1" column="1">
+       <widget class="QTabWidget" name="tabWidget">
+        <property name="currentIndex">
+         <number>1</number>
         </property>
-        <property name="horizontalScrollBarPolicy">
-         <enum>Qt::ScrollBarAsNeeded</enum>
-        </property>
+        <widget class="QWidget" name="tab_7">
+         <attribute name="title">
+          <string>Persistence Diagram</string>
+         </attribute>
+         <widget class="QGraphicsView" name="pdView">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>-20</y>
+            <width>421</width>
+            <height>581</height>
+           </rect>
+          </property>
+         </widget>
+        </widget>
+        <widget class="QWidget" name="tab_8">
+         <attribute name="title">
+          <string>Dendrogram</string>
+         </attribute>
+         <widget class="QGraphicsView" name="dendrogramView">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>500</width>
+            <height>550</height>
+           </rect>
+          </property>
+         </widget>
+        </widget>
        </widget>
       </item>
      </layout>
@@ -525,7 +558,6 @@
  <layoutdefault spacing="6" margin="11"/>
  <tabstops>
   <tabstop>sliceView</tabstop>
-  <tabstop>pdView</tabstop>
   <tabstop>angleDoubleSpinBox</tabstop>
   <tabstop>offsetSpinBox</tabstop>
   <tabstop>xi0CheckBox</tabstop>

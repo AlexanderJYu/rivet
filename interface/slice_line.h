@@ -25,15 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct ConfigParameters;
 class ControlDot;
 class SliceDiagram;
+class QNEMainWindow;
 
 #include <QGraphicsItem>
 #include <QPainter>
 #include <QVariant>
 #include <QtWidgets>
+#include "qnodeseditor/qnemainwindow.h"
 
-class SliceLine : public QGraphicsItem {
+class SliceLine : public QObject, public QGraphicsItem {
+    Q_OBJECT
 public:
     SliceLine(SliceDiagram* sd, ConfigParameters* params); //VisualizationWindow* vw);
+    SliceLine(QNEMainWindow* mw, ConfigParameters* params);
 
     void setDots(ControlDot* left, ControlDot* right);
 
@@ -53,7 +57,7 @@ public:
     double get_slope(); //gets the slope of the line
     bool is_vertical(); //true if the line is vertical, false otherwise
 
-    void update_bounds(double data_width, double data_height, int padding); //updates the dimensions of the on-screen box in which this line is allowed to move
+    void update_bounds(double data_width, double data_height, int padding, double xmin); //updates the dimensions of the on-screen box in which this line is allowed to move
     void update_position(double xpos, double ypos, bool vert, double pixel_slope); //updates position of line; called by SliceDiagram in response to change in VisualizationWindow controls
 
     double get_data_xmax();
@@ -61,12 +65,16 @@ public:
     double get_box_xmax();
     double get_box_ymax();
 
+signals:
+    void slice_line_released();
+
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* event);
     void mouseReleaseEvent(QGraphicsSceneMouseEvent* event);
     void mouseMoveEvent(QGraphicsSceneMouseEvent* event);
 
 private:
+    double data_xmin;
     double data_xmax, data_ymax; //pixel dimensions slightly greater than the largest possible data values (i.e. largest multi-grade)
     double box_xmax, box_ymax; //pixel dimensions of the on-screen box in which this line is allowed to move
 
@@ -76,6 +84,7 @@ private:
     bool pressed; //true when the line is clicked
     bool rotating; //true when a rotation is in progress
     bool update_lock; //true when the line is being moved as result of external input; to avoid update loops
+    bool dendrogram_mode; //true when slice line being used is in the dendrogram diagram
 
     QPointF right_point; //this is the top/right endpoint of the line
 
@@ -83,6 +92,7 @@ private:
     ControlDot* right_dot;
 
     SliceDiagram* sdgm;
+    QNEMainWindow* mwin;
     ConfigParameters* config_params;
 
     void compute_right_point(); //sets correct position of right_point, given slope of line and position of left point

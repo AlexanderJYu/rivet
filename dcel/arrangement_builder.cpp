@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <algorithm> //for find function in version 3 of find_subpath
 #include <cutgraph.h>
 #include <stack> //for find_subpath
+#include "graph.h"
+//#include <QMainWindow>
 
     using rivet::numeric::INFTY;
 
@@ -41,11 +43,88 @@ ArrangementBuilder::ArrangementBuilder(unsigned verbosity)
     : verbosity(verbosity)
 {
 }
+/*
+struct dendrogram_metadata
+{
+    DenseGRAPH<Edge>* graph;
+    boost::unordered::unordered_map<std::pair<double,int>, Time_root>& time_root_to_tr;
+    Time_root& last_upper_tr;
+};*/
+
+//builds the DCEL arrangement, computes and stores dendrogram data
+//also stores ordered list of xi support points in the supplied vector
+//precondition: the constructor has already created the boundary of the arrangement
+std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(
+    //SimplexTree& bif,
+    BifiltrationData& bif_data,
+    std::vector<exact> x_exact,
+    std::vector<exact> y_exact,
+    std::vector<TemplatePoint>& template_points,
+    Progress& progress,
+    boost::unordered::unordered_map<std::pair<int,int>,std::map<int, Subset_map>> oracle,
+    computing_s* cs)
+{
+    Timer timer;
+
+    //first, create PersistenceUpdater
+    //this also finds anchors and stores them in the vector Arrangement::all_anchors -- JULY 2015 BUG FIX
+    progress.progress(10);
+    std::shared_ptr<Arrangement> arrangement(new Arrangement(x_exact, y_exact, verbosity));
+    BifiltrationData dummy_data(0,0);
+    FIRep dummy_tree(dummy_data, 0);
+    PersistenceUpdater updater(*arrangement, dummy_tree, bif_data, template_points, verbosity); //PersistenceUpdater object is able to do the calculations necessary for finding anchors and computing dendrogram templates
+    updater.set_oracle(oracle);
+    updater.set_cs(cs);
+    if (verbosity >= 2) {
+        debug() << "Anchors found; this took " << timer.elapsed() << " milliseconds.";
+    }
+
+    //now that we have all the anchors, we can build the interior of the arrangement
+    progress.progress(25);
+    timer.restart();
+    build_interior(arrangement);
+    if (verbosity >= 2) {
+        debug() << "Dendrogram line arrangement constructed; this took " << timer.elapsed() << " milliseconds.";
+        if (verbosity >= 4) {
+            arrangement->print_stats();
+        }
+    }
+
+    //compute the edge weights
+    progress.progress(50);
+    timer.restart();
+    //find_edge_weights(*arrangement, updater);
+    find_edge_weights(*arrangement, updater, true);
+    if (verbosity >= 2) {
+        debug() << "Dendrogram edge weights computed; this took " << timer.elapsed() << " milliseconds.";
+    }
+
+    //now that the arrangement is constructed, we can find a path -- NOTE: path starts with a (near-vertical) line to the right of all multigrades
+    progress.progress(75);
+    std::vector<std::shared_ptr<Halfedge>> path;
+    timer.restart();
+    find_path(*arrangement, path);
+    if (verbosity >= 2) {
+        debug() << "Found path through the dendrogram arrangement; this took " << timer.elapsed() << " milliseconds.";
+    }
+
+    //update the progress dialog box
+    progress.advanceProgressStage(); //update now in stage 5 (compute discrete barcodes)
+    progress.setProgressMaximum(path.size());
+
+    //finally, we can traverse the path, computing and storing a dendrogram template in each 2-cell
+    //updater.store_barcodes_with_reset(path, progress);
+    //boost::unordered::unordered_map<std::pair<int,int>, dendrogram_metadata> anchor_to_metadata;
+    updater.store_dendrogram_templates(path, progress);
+    return arrangement;
+
+} //end build_arrangement()
 
 //builds the DCEL arrangement, computes and stores persistence data
 //also stores ordered list of xi support points in the supplied vector
 //precondition: the constructor has already created the boundary of the arrangement
-std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(MultiBetti& mb,
+std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(
+    MultiBetti& mb,
     std::vector<exact> x_exact,
     std::vector<exact> y_exact,
     std::vector<TemplatePoint>& template_points,
@@ -56,8 +135,10 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(MultiBetti& m
     //first, create PersistenceUpdater
     //this also finds anchors and stores them in the vector Arrangement::all_anchors -- JULY 2015 BUG FIX
     progress.progress(10);
+    BifiltrationData dummy_data(0,0); // to satisfy constructor
     std::shared_ptr<Arrangement> arrangement(new Arrangement(x_exact, y_exact, verbosity));
-    PersistenceUpdater updater(*arrangement, mb.bifiltration, template_points, verbosity); //PersistenceUpdater object is able to do the calculations necessary for finding anchors and computing barcode templates
+    PersistenceUpdater updater(*arrangement, mb.bifiltration, dummy_data, template_points, verbosity); //PersistenceUpdater object is able to do the calculations necessary for finding anchors and computing barcode templates
+
     if (verbosity >= 2) {
         debug() << "Anchors found; this took " << timer.elapsed() << " milliseconds.";
     }
@@ -77,6 +158,7 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(MultiBetti& m
     progress.progress(50);
     timer.restart();
     find_edge_weights(*arrangement, updater);
+    //find_dendrogram_edge_weights(dendrogram_arrangement);
     if (verbosity >= 2) {
         debug() << "Edge weights computed; this took " << timer.elapsed() << " milliseconds.";
     }
@@ -113,8 +195,10 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(std::vector<e
     //TODO: this is odd, fix.
     BifiltrationData dummy_data(0, 0);
     FIRep dummy_tree(dummy_data, 0);
+    //SimplexTree dummy_tree(0, 0);
+    //BifiltrationData dummy_data(0, 0); // to satisfy constructor
     std::shared_ptr<Arrangement> arrangement(new Arrangement(x_exact, y_exact, verbosity));
-    PersistenceUpdater updater(*arrangement, dummy_tree, xi_pts, verbosity); //we only use the PersistenceUpdater to find and store the anchors
+    PersistenceUpdater updater(*arrangement, dummy_tree, dummy_data, xi_pts, verbosity); //we only use the PersistenceUpdater to find and store the anchors
     if (verbosity >= 2) {
         debug() << "Anchors found; this took " << timer.elapsed() << " milliseconds.";
     }
@@ -429,7 +513,7 @@ void ArrangementBuilder::build_interior(std::shared_ptr<Arrangement> arrangement
 } //end build_interior()
 
 //computes and stores the edge weight for each anchor line
-void ArrangementBuilder::find_edge_weights(Arrangement& arrangement, PersistenceUpdater& updater)
+void ArrangementBuilder::find_edge_weights(Arrangement& arrangement, PersistenceUpdater& updater, bool calculating_dendrogram_templates)
 {
     std::vector<std::shared_ptr<Halfedge>> pathvec;
     std::shared_ptr<Halfedge> cur_edge = arrangement.topright;
@@ -447,7 +531,12 @@ void ArrangementBuilder::find_edge_weights(Arrangement& arrangement, Persistence
     }
 
     //run the "main algorithm" without any matrices
-    updater.set_anchor_weights(pathvec);
+    //updater.set_anchor_weights(pathvec);
+
+    if (calculating_dendrogram_templates)
+        updater.set_uniform_anchor_weights(pathvec);
+    else
+        updater.set_anchor_weights(pathvec);
 
     //reset the PersistenceUpdater to its state at the beginning of this function
     updater.clear_levelsets();

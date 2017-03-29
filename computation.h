@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "math/firep.h"
 #include "math/template_point.h"
 #include "numerics.h"
+#include "math/bifiltration_data.h"
 
 #include "boost/multi_array.hpp"
 #include <boost/multiprecision/cpp_int.hpp>
@@ -51,6 +52,11 @@ public:
         return *(data.bifiltration_data);
     }
 
+    BifiltrationData& bifiltration_data()
+    {
+        return *(data.bifiltration_data);
+    }
+
     ComputationInput(InputData data)
         : data(data)
         , x_exact(data.x_exact)
@@ -64,15 +70,21 @@ public:
 struct ComputationResult {
     unsigned_matrix homology_dimensions;
     std::vector<TemplatePoint> template_points;
+    std::vector<TemplatePoint> dendrogram_template_points;
     std::shared_ptr<Arrangement> arrangement;
-    //std::shared_ptr<FIRep> bifiltration;
+
+    std::shared_ptr<Arrangement> dendrogram_arrangement;
+    std::shared_ptr<SimplexTree> bifiltration;
+    // UNCOMMENT LATER MAYBE std::shared_ptr<BifiltrationData> bifiltration_data;
 };
 
 class Computation {
 public:
     //TODO: these signals are a little strange, they should go away soon
     boost::signals2::signal<void(std::shared_ptr<Arrangement>)> arrangement_ready;
+    boost::signals2::signal<void(std::shared_ptr<Arrangement>)> dendrogram_arrangement_ready;
     boost::signals2::signal<void(TemplatePointsMessage)> template_points_ready;
+    boost::signals2::signal<void(TemplatePointsMessage)> dendrogram_template_points_ready;
     Computation(InputParameters& params, Progress& progress);
     ~Computation();
 
@@ -85,4 +97,7 @@ private:
     const int verbosity;
 
     std::unique_ptr<ComputationResult> compute_raw(ComputationInput& input);
+    std::unique_ptr<ComputationResult> dendrogram_compute_raw(ComputationInput& input);
+
+
 };

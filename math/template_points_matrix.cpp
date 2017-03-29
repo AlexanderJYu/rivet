@@ -171,8 +171,10 @@ std::vector<std::shared_ptr<TemplatePointsMatrixEntry>> TemplatePointsMatrix::fi
             std::shared_ptr<TemplatePointsMatrixEntry> new_entry(new TemplatePointsMatrixEntry(i, j, insertion_point, columns[i], rows[j]));
             columns[i] = new_entry;
             rows[j] = new_entry;
+            std::cout << "TptsMat[" << i << "][" << j << "] = (" << new_entry->x << "," << new_entry->y << ")" << std::endl;
 
             if (anchor) {
+                std::cout << " is anchor" << std::endl;
                 matrix_entries.push_back(new_entry);
             }
         }
@@ -192,10 +194,16 @@ std::shared_ptr<TemplatePointsMatrixEntry> TemplatePointsMatrix::get_col(unsigne
     return columns[c];
 }
 
-//retuns the number of rows
+//returns the number of rows
 unsigned TemplatePointsMatrix::height()
 {
     return rows.size();
+}
+
+//returns the number of cols
+unsigned TemplatePointsMatrix::width()
+{
+    return columns.size();
 }
 
 //clears the level set lists for all entries in the matrix

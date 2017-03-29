@@ -124,6 +124,10 @@ public:
     void print_bifiltration();
     void print_bifiltration(STNode* node, std::string parent, int cur_dim, int print_dim);
 
+    SimplexSet get_ordered_simplices() { return ordered_simplices; }
+    SimplexSet get_ordered_low_simplices() { return ordered_low_simplices; }
+    SimplexSet get_ordered_high_simplices() { return ordered_high_simplices; }
+
 private:
     STNode* root; //root node of the simplex tree
 

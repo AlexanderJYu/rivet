@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "math/template_points_matrix.h"
 #include "numerics.h"
 #include "type_tag.h"
+#include "time_root.h"
 //namespace boost {
 //    namespace multiprecision {
 //        template<class Archive>
@@ -78,7 +79,8 @@ void Halfedge::serialize(Archive& ar, const unsigned int /*version*/)
 template <class Archive>
 void Face::serialize(Archive& ar, const unsigned int /*version*/)
 {
-    ar& boundary& dbc& visited & identifier;
+    //ar& boundary& dbc& visited & identifier;
+    ar& boundary& dbc& tr& visited & identifier;
 }
 
 template <class Archive>

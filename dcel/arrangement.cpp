@@ -182,6 +182,49 @@ std::shared_ptr<Halfedge> Arrangement::create_edge_left(std::shared_ptr<Halfedge
     return new_edge;
 } //end create_edge_left()
 
+//returns dendrogram template associated with the specified line (point)
+//REQUIREMENT: 0 <= degrees <= 90
+Time_root& Arrangement::get_dendrogram_template(double degrees, double offset)
+{
+    ///TODO: store some point/cell to seed the next query
+    std::shared_ptr<Face> cell;
+    if (degrees == 90) //then line is vertical
+    {
+        cell = find_vertical_line(-1 * offset); //multiply by -1 to correct for orientation of offset
+        if (verbosity >= 8) {
+            debug() << " ||| vertical line found in cell " << FID(cell);
+        }
+
+    } else if (degrees == 0) { //then line is horizontal
+        std::shared_ptr<Anchor> anchor = find_least_upper_anchor(offset);
+
+        if (anchor != nullptr)
+            cell = anchor->get_line()->get_face();
+        else
+            cell = topleft->get_twin()->get_face(); //default
+
+        if (verbosity >= 8) {
+            debug() << " --- horizontal line found in cell " << FID(cell);
+        }
+
+    } else {
+        //else: the line is neither horizontal nor vertical
+        double radians = degrees * 3.14159265 / 180;
+        double slope = tan(radians);
+        double intercept = offset / cos(radians);
+        cell = find_point(slope, -1 * intercept); //multiply by -1 for point-line duality
+    }
+    ///TODO: REPLACE THIS WITH A SEEDED SEARCH
+    debug() << "cell = " << FID(cell);
+    return cell->get_dendrogram();
+} //end get_barcode_template()
+
+//returns the barcode template associated with faces[i]
+Time_root& Arrangement::get_dendrogram_template(unsigned i)
+{
+    return faces[i]->get_dendrogram();
+}
+
 //returns barcode template associated with the specified line (point)
 //REQUIREMENT: 0 <= degrees <= 90
 BarcodeTemplate& Arrangement::get_barcode_template(double degrees, double offset)

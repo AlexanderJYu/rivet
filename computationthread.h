@@ -60,6 +60,7 @@ signals:
     void setCurrentProgress(unsigned current);
     void templatePointsReady(std::shared_ptr<TemplatePointsMessage> template_points);
     void arrangementReady(std::shared_ptr<ArrangementMessage> arrangement);
+    void dendrogramArrangementReady(std::shared_ptr<ArrangementMessage> dendrogram_arrangement);
 
 protected:
     void run() Q_DECL_OVERRIDE;
@@ -68,6 +69,7 @@ private:
     InputParameters& params;
 
     std::shared_ptr<ArrangementMessage> arrangement;
+    std::shared_ptr<ArrangementMessage> dendrogram_arrangement;
 
     void compute_from_file();
     void unpack_message_fields();

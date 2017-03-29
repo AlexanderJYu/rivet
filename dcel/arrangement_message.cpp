@@ -90,7 +90,7 @@ ArrangementMessage::ArrangementMessage(Arrangement const& arrangement)
     //build data structures
 
     for (auto face : arrangement.faces) {
-        faces.push_back(FaceM{ HalfedgeId(HID(face->get_boundary())), face->get_barcode() });
+        faces.push_back(FaceM{ HalfedgeId(HID(face->get_boundary())), face->get_barcode(), face->get_dendrogram() });
     }
     for (auto half : arrangement.halfedges) {
         half_edges.push_back(HalfedgeM{
@@ -308,6 +308,32 @@ ArrangementMessage::AnchorM& ArrangementMessage::get(ArrangementMessage::AnchorI
     return anchors[static_cast<long>(index)];
 }
 
+Time_root ArrangementMessage::get_dendrogram_template(double degrees, double offset)
+{
+    ///TODO: store some point/cell to seed the next query
+    FaceId cell;
+    if (degrees == 90) //then line is vertical
+    {
+        cell = find_vertical_line(-1 * offset); //multiply by -1 to correct for orientation of offset
+    } else if (degrees == 0) { //then line is horizontal
+        auto anchor = find_least_upper_anchor(offset);
+
+        if (anchor)
+            cell = get(anchor.get().dual_line).face;
+        else
+            cell = get(get(topleft).twin).face; //default
+    } else {
+        //else: the line is neither horizontal nor vertical
+        double radians = degrees * 3.14159265 / 180;
+        double slope = tan(radians);
+        double intercept = offset / cos(radians);
+        cell = find_point(slope, -1 * intercept); //multiply by -1 for point-line duality
+    }
+    ///TODO: REPLACE THIS WITH A SEEDED SEARCH
+
+    return get(cell).tr;
+} //end get_dendrogram_template()
+
 BarcodeTemplate ArrangementMessage::get_barcode_template(double degrees, double offset)
 {
     ///TODO: store some point/cell to seed the next query
@@ -454,6 +480,7 @@ Arrangement ArrangementMessage::to_arrangement() const
             mface->set_boundary(arrangement.halfedges[static_cast<long>(face.boundary)]);
         }
         mface->set_barcode(face.dbc);
+        mface->set_dendrogram(face.tr);
     }
     for (size_t i = 0; i < half_edges.size(); i++) {
         ::Halfedge& edge = *(arrangement.halfedges[i]);

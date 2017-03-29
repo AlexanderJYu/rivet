@@ -100,6 +100,7 @@ void ComputationThread::load_from_file()
     emit templatePointsReady(message);
     archive >> *arrangement;
     emit arrangementReady(arrangement);
+    //emit dendrogramArrangementReady(dendrogram_arrangement);
 }
 
 void ComputationThread::compute_from_file()
@@ -108,6 +109,7 @@ void ComputationThread::compute_from_file()
 
     args << QString::fromStdString(params.fileName)
          << QDir(QCoreApplication::applicationDirPath()).filePath("rivet_arrangement_temp")
+         << QDir(QCoreApplication::applicationDirPath()).filePath("rivet_dendrogram_arrangement_temp")
          << "-H" << QString::number(params.dim)
          << "-x" << QString::number(params.x_bins)
          << "-y" << QString::number(params.y_bins)
@@ -131,6 +133,7 @@ void ComputationThread::compute_from_file()
             if (reading_xi) {
                 if (line.startsWith("END XI")) {
                     {
+                        qDebug() << "reached END XI line";
                         message.reset(new TemplatePointsMessage());
                         boost::archive::text_iarchive archive(ss);
                         archive >> *message;
@@ -142,6 +145,7 @@ void ComputationThread::compute_from_file()
                 }
             } else if (line.startsWith("ARRANGEMENT: ")) {
                 {
+                    qDebug() << "reached ARRANGEMENT line";
                     console->waitForFinished();
                     std::ifstream input(line.mid(QString("ARRANGEMENT: ").length()).trimmed().toStdString());
                     if (!input.is_open()) {
@@ -154,19 +158,62 @@ void ComputationThread::compute_from_file()
                     }
                     //qDebug() << "ComputationThread::compute_from_file() : checkpoint A -- template_points.size() = "
                     //         << message->template_points.size();
+                    qDebug() << "reached 1";
                     boost::archive::binary_iarchive archive(input);
                     message.reset(new TemplatePointsMessage());
                     arrangement.reset(new ArrangementMessage());
+                    //dendrogram_arrangement.reset(new ArrangementMessage());
                     InputParameters p;
                     archive >> p;
                     archive >> *message;
                     archive >> *arrangement;
+                    //archive >> *dendrogram_arrangement;
+                    qDebug() << "Reached 2";
                     //qDebug() << "ComputationThread::compute_from_file() : checkpoint B -- template_points.size() = "
                     //         << message->template_points.size();
                     emit templatePointsReady(message);
                 }
                 //                qDebug() << "Arrangement received: " << arrangement->x_exact.size() << " x " << arrangement->y_exact.size();
                 emit arrangementReady(arrangement);
+                //emit dendrogramArrangementReady(dendrogram_arrangement);
+                qDebug() << "Reached 3";
+                //return;
+            } else if (line.startsWith("DENDROGRAM ARRANGEMENT: ")) {
+                {
+                    qDebug() << "reached DENDROGRAM ARRANGEMENT line";
+                    console->waitForFinished();
+                    std::ifstream input(line.mid(QString("DENDROGRAM ARRANGEMENT: ").length()).trimmed().toStdString());
+                    if (!input.is_open()) {
+                        throw std::runtime_error("Could not open console arrangement file");
+                    }
+                    std::string type;
+                    std::getline(input, type);
+
+                    if (type != "RIVET_1") {
+                        qDebug() << "type = " << QString::fromStdString(type);
+                        throw std::runtime_error("Unsupported file format");
+                    }
+                    //qDebug() << "ComputationThread::compute_from_file() : checkpoint A -- template_points.size() = "
+                    //         << message->template_points.size();
+                    qDebug() << "reached 1";
+                    boost::archive::binary_iarchive archive(input);
+                    message.reset(new TemplatePointsMessage());
+                    dendrogram_arrangement.reset(new ArrangementMessage());
+                    //dendrogram_arrangement.reset(new ArrangementMessage());
+                    InputParameters p;
+                    archive >> p;
+                    archive >> *message;
+                    archive >> *dendrogram_arrangement;
+                    //archive >> *dendrogram_arrangement;
+                    qDebug() << "Reached 2";
+                    //qDebug() << "ComputationThread::compute_from_file() : checkpoint B -- template_points.size() = "
+                    //         << message->template_points.size();
+                    //emit templatePointsReady(message);
+                }
+                //                qDebug() << "Arrangement received: " << arrangement->x_exact.size() << " x " << arrangement->y_exact.size();
+                //emit arrangementReady(arrangement);
+                emit dendrogramArrangementReady(dendrogram_arrangement);
+                qDebug() << "Reached 3";
                 return;
             } else if (line.startsWith("PROGRESS ")) {
                 auto progress = line.mid(QString("PROGRESS ").length()).trimmed();

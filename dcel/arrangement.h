@@ -43,6 +43,7 @@ class Vertex;
 #include "pointer_comparator.h"
 #include <set>
 #include <vector>
+#include "time_root.h"
 
 class ArrangementMessage;
 
@@ -66,6 +67,12 @@ public:
     //returns the barcode template associated with faces[i]
     BarcodeTemplate& get_barcode_template(unsigned i);
 
+    //returns dendrogram template associated with the specified line (point)
+    Time_root& get_dendrogram_template(double degrees, double offset);
+
+    //returns the dendrogram template associated with faces[i]
+    Time_root& get_dendrogram_template(unsigned i);
+
     //returns the number of 2-cells, and thus the number of barcode templates, in the arrangement
     unsigned num_faces();
 
@@ -80,6 +87,9 @@ public:
     //references to vectors of multi-grade values
     std::vector<exact> x_exact; //exact values for all x-grades
     std::vector<exact> y_exact; //exact values for all y-grades
+
+    std::vector<double> get_x_grades() { return x_grades; }
+    std::vector<double> get_y_grades() { return y_grades; }
 
     //these are necessary for comparisons; TODO: should they be static members of Arrangement?
     static double epsilon;

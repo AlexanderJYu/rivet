@@ -27,6 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dcel/arrangement.h"
 #include "interface/progress.h"
 #include "math/multi_betti.h"
+#include <boost/unordered/unordered_map.hpp>
+#include "subset.h"
+#include "computing_s.h"
 
 class ArrangementBuilder {
 public:
@@ -35,7 +38,8 @@ public:
     //builds the DCEL arrangement, computes and stores persistence data
     //also stores ordered list of xi support points in the supplied vector
     //precondition: the constructor has already created the boundary of the arrangement
-    std::shared_ptr<Arrangement> build_arrangement(MultiBetti& mb,
+    std::shared_ptr<Arrangement> build_arrangement(
+        MultiBetti& mb,
         std::vector<exact> x_exact,
         std::vector<exact> y_exact,
         std::vector<TemplatePoint>& template_points,
@@ -47,12 +51,24 @@ public:
         std::vector<exact> y_exact,
         std::vector<TemplatePoint>& template_points, std::vector<BarcodeTemplate>& barcode_templates, Progress& progress);
 
+    //builds the DCEL arrangement, computes and stores dendrogram data
+    //also stores ordered list of xi support points in the supplied vector
+    //precondition: the constructor has already created the boundary of the arrangement
+    std::shared_ptr<Arrangement> build_arrangement(
+        SimplexTree& bif, BifiltrationData& bif_data,
+        std::vector<exact> x_exact,
+        std::vector<exact> y_exact,
+        std::vector<TemplatePoint>& template_points,
+        Progress& progress,
+        boost::unordered::unordered_map<std::pair<int,int>,std::map<int, Subset_map>> oracle,
+        computing_s* cs);
+
 private:
     unsigned verbosity;
     void build_interior(std::shared_ptr<Arrangement> arrangement);
     //builds the interior of DCEL arrangement using a version of the Bentley-Ottmann algorithm
     //precondition: all achors have been stored via find_anchors()
-    void find_edge_weights(Arrangement& arrangement, PersistenceUpdater& updater);
+    void find_edge_weights(Arrangement& arrangement, PersistenceUpdater& updater, bool calculating_dendrogram_templates = false);
     void find_path(Arrangement& arrangement, std::vector<std::shared_ptr<Halfedge>>& pathvec);
     void find_subpath(Arrangement& arrangement, unsigned cur_node, std::vector<std::vector<unsigned>>& adj, std::vector<std::shared_ptr<Halfedge>>& pathvec);
 };

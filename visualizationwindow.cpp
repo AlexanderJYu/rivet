@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "interface/config_parameters.h"
 #include "interface/file_writer.h"
 #include "numerics.h"
+#include "qnodeseditor/qnodeseditor.h"
 
 #include <QDateTime>
 #include <QDebug>
@@ -61,6 +62,8 @@ VisualizationWindow::VisualizationWindow(InputParameters& params)
     , slice_update_lock(false)
     , p_diagram(&config_params, this)
     , persistence_diagram_drawn(false)
+    , dendrogram_diagram(NULL,&config_params,this)
+    , dendrogram_arrangement_received(false)
 {
     ui->setupUi(this);
 
@@ -75,6 +78,20 @@ VisualizationWindow::VisualizationWindow(InputParameters& params)
     ui->pdView->scale(1, -1);
     ui->pdView->setRenderHint(QPainter::Antialiasing);
 
+    //set up the dendrogram diagram scene
+    std::cout << "setting up the dendrogram diagram" << std::endl;
+    ui->dendrogramView->setScene(&dendrogram_diagram);
+    ui->dendrogramView->scale(1,-1);
+    ui->dendrogramView->setRenderHint(QPainter::Antialiasing);
+    ui->xposBox->setMinimum(-100.00); // MAGIC NUMBER
+    std::cout << "done setting up the dendrogram diagram" << std::endl;
+
+    ui->clusterText->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+    // Style just to make it clear that the widget is
+    // being resized to fit the parent, it doesn't "overflow"
+    ui->clusterText->setFrameShape(QFrame::Box);
+    ui->clusterText->setFrameShadow(QFrame::Raised);
+
     //connect signal from DataSelectDialog to start the computation
     QObject::connect(&ds_dialog, &DataSelectDialog::dataSelected, this, &VisualizationWindow::start_computation);
 
@@ -84,6 +101,7 @@ VisualizationWindow::VisualizationWindow(InputParameters& params)
     QObject::connect(&cthread, &ComputationThread::setCurrentProgress, &prog_dialog, &ProgressDialog::updateProgress);
     QObject::connect(&cthread, &ComputationThread::templatePointsReady, this, &VisualizationWindow::paint_template_points);
     QObject::connect(&cthread, &ComputationThread::arrangementReady, this, &VisualizationWindow::augmented_arrangement_ready);
+    QObject::connect(&cthread, &ComputationThread::dendrogramArrangementReady, this, &VisualizationWindow::dendrogram_arrangement_ready);
     QObject::connect(&cthread, &ComputationThread::finished, &prog_dialog, &ProgressDialog::setComputationFinished);
 
     //connect signals and slots for the diagrams
@@ -94,6 +112,10 @@ VisualizationWindow::VisualizationWindow(InputParameters& params)
     QObject::connect(&p_diagram, &PersistenceDiagram::persistence_dot_secondary_selection, &slice_diagram, &SliceDiagram::receive_bar_secondary_selection);
     QObject::connect(&p_diagram, &PersistenceDiagram::persistence_dot_deselected, &slice_diagram, &SliceDiagram::receive_bar_deselection);
 
+    std::cout << "setting up the dendrogram connections" << std::endl;
+    QObject::connect(&dendrogram_diagram, &QNEMainWindow::set_cluster_label, this, &VisualizationWindow::set_cluster_label);
+    QObject::connect(&dendrogram_diagram, &QNEMainWindow::set_xpos_box, this, &VisualizationWindow::set_xpos_box);
+    std::cout << "done setting up the dendrogram connections" << std::endl;
     //connect other signals and slots
     QObject::connect(&prog_dialog, &ProgressDialog::stopComputation, &cthread, &ComputationThread::terminate); ///TODO: don't use QThread::terminate()! modify ComputationThread so that it can stop gracefully and clean up after itself
 }
@@ -143,6 +165,21 @@ void VisualizationWindow::paint_template_points(std::shared_ptr<TemplatePointsMe
             ui->normCoordCheckBox->isChecked(), template_points->homology_dimensions);
     }
 
+    // create slice_line in dendrogramView
+    qDebug() << "create slice_line in dendrogramView";
+    std::cout << "create slice_line in dendrogramView" << std::endl;
+    slice_line = slice_diagram.get_slice_line();
+    QObject::connect(slice_line, &SliceLine::slice_line_released, this, &VisualizationWindow::slice_line_released);
+
+    //create right control dot
+    dot_right = slice_diagram.get_dot_right();
+    QObject::connect(dot_right, &ControlDot::right_dot_released, this, &VisualizationWindow::right_dot_released);
+
+    //create left control dot
+    dot_left = slice_diagram.get_dot_left();
+    QObject::connect(dot_left, &ControlDot::left_dot_released, this, &VisualizationWindow::left_dot_released);
+    std::cout << "finished slice_line stuff" << std::endl;
+
     //enable control items
     ui->BettiLabel->setEnabled(true);
     ui->xi0CheckBox->setEnabled(true);
@@ -160,9 +197,19 @@ void VisualizationWindow::paint_template_points(std::shared_ptr<TemplatePointsMe
     ui->statusBar->showMessage("bigraded Betti number visualization ready");
 }
 
+//this slot is signaled when the dendrogram arrangement is ready
+void VisualizationWindow::dendrogram_arrangement_ready(std::shared_ptr<ArrangementMessage> dendrogram_arrangement)
+{
+    //receive the arrangement
+    qDebug() << "dendrogram_arrangement_ready";
+    dendrogram_arrangement_received = true;
+    this->dendrogram_arrangement = dendrogram_arrangement;
+}
+
 //this slot is signaled when the augmented arrangement is ready
 void VisualizationWindow::augmented_arrangement_ready(std::shared_ptr<ArrangementMessage> arrangement)
 {
+    qDebug() << "augmented_arrangement_ready";
     //receive the arrangement
     this->arrangement = arrangement;
 
@@ -222,6 +269,12 @@ void VisualizationWindow::on_angleDoubleSpinBox_valueChanged(double angle)
     }
 
     update_persistence_diagram();
+    qDebug() << "update_dendrogram_diagram 1";
+    if (dendrogram_arrangement_received)
+    {
+        qDebug() << "dendrogram_arrangement_received";
+        update_dendrogram_diagram();
+    }
 }
 
 void VisualizationWindow::on_offsetSpinBox_valueChanged(double offset)
@@ -232,6 +285,12 @@ void VisualizationWindow::on_offsetSpinBox_valueChanged(double offset)
     }
 
     update_persistence_diagram();
+    qDebug() << "update_dendrogram_diagram 2";
+    if (dendrogram_arrangement_received)
+    {
+        qDebug() << "dendrogram_arrangement_received";
+        update_dendrogram_diagram();
+    }
 }
 
 void VisualizationWindow::on_normCoordCheckBox_clicked(bool checked)
@@ -268,6 +327,120 @@ void VisualizationWindow::on_xi2CheckBox_toggled(bool checked)
         slice_diagram.toggle_xi2_points(checked);
 }
 
+enum {is_forest_connector = -2}; // MAGIC NUMBER
+
+void VisualizationWindow::project_template_dendrogram(Time_root& tr)
+{
+    int x,y;
+    if (tr.r == is_forest_connector)
+    {
+        x = 0;
+        y = 0;
+    }
+    else
+    {
+        x = tr.bigrade.first;
+        y = tr.bigrade.second;
+    }
+    TemplatePoint pt(x,y,0,0,0);
+    tr.t = project(pt, angle_precise, offset_precise);
+    std::vector<std::shared_ptr<Time_root>> new_children;
+    for (auto child : tr.children)
+    {
+        Time_root new_child = *child;
+        std::shared_ptr<Time_root> new_child_ptr = std::make_shared<Time_root>(new_child);
+        project_template_dendrogram(*new_child_ptr);
+        new_children.push_back(new_child_ptr);
+    }
+    tr.children = new_children;
+    return;
+}
+
+void VisualizationWindow::update_dendrogram_diagram()
+{
+    qDebug() << "******** UPDATE_DENDROGRAM_DIAGRAM *********";
+    //projected_grades_of_appearance(angle_precise, offset_precise);
+    qDebug() << "angle_precise = " << angle_precise;
+    qDebug() << "offset_precise = " << offset_precise;
+    const Time_root& tr = dendrogram_arrangement->get_dendrogram_template(angle_precise, offset_precise);
+    qDebug() << "recursively_print_tr(tr) in update_dendrogram_diagram";
+    Time_root::recursively_print_tr(tr);
+    //std::unordered_map<std::pair<double,int>, Time_root> new_time_root_to_tr;
+    //Time_root new_last_upper_tr;
+    Time_root projected_tr = tr; //shallow copy hopefully
+    project_template_dendrogram(projected_tr);
+    qDebug() << "recursively_print_tr(projected_tr) in update_dendrogram_diagram";
+    Time_root::recursively_print_tr(projected_tr, true);
+
+    dendrogram_diagram.removeEventFilter(nodesEditor);
+    qDebug() << "removeEventFilter success";
+    dendrogram_diagram.update_dendrogram(projected_tr);
+    qDebug() << "update_dendrogram success";
+
+
+
+
+    // attempt at continuous updates
+    /*QNEMainWindow* d_diagram = new QNEMainWindow(projected_tr,
+                                                 &config_params,
+                                                 this);*/
+
+    /*QNodesEditor* nodesEditor = new QNodesEditor(this, dendrogram_diagram.get_block_x_scale(),
+                                                 dendrogram_diagram.get_block_y_scale(),
+                                                 &config_params);*/
+    nodesEditor = new QNodesEditor(this, dendrogram_diagram.get_block_x_scale(),
+                                   dendrogram_diagram.get_block_y_scale(),
+                                   &config_params);
+
+    nodesEditor->install(&dendrogram_diagram);
+
+    /*
+    ui->xposBox->setMinimum(-100.00); // MAGIC NUMBER
+    dendrogram_diagram = new QNEMainWindow(projected_tr,
+                                           &config_params,
+                                           this);
+
+    //dendrogram_diagram = new QNEMainWindow(graph, vertex_appearance, new_time_root_to_tr, new_last_upper_tr, &config_params, this);
+    QObject::connect(dendrogram_diagram, &QNEMainWindow::set_cluster_label, this, &VisualizationWindow::set_cluster_label);
+    QObject::connect(dendrogram_diagram, &QNEMainWindow::set_xpos_box, this, &VisualizationWindow::set_xpos_box);
+
+
+    ui->dendrogramView->setScene(dendrogram_diagram);
+    ui->dendrogramView->setRenderHint(QPainter::Antialiasing);
+
+    QNodesEditor* nodesEditor = new QNodesEditor(this, dendrogram_diagram->get_block_x_scale(),
+                                                 dendrogram_diagram->get_block_y_scale(),
+                                                 &config_params);
+    nodesEditor->install(dendrogram_diagram);*/
+}
+
+double VisualizationWindow::project(TemplatePoint& pt, double angle, double offset)
+{
+    if(angle == 0)  //then line is horizontal
+    {
+        if( grades.y[pt.y] <= offset)   //then point is below the line, so projection exists
+            return grades.x[pt.x];
+        else    //then no projection
+            return INFTY;
+    }
+    else if(angle == 90)    //then line is vertical
+    {
+        if( grades.x[pt.x] <= -1*offset)   //then point is left of the line, so projection exists
+            return grades.y[pt.y];
+        else    //then no projection
+            return INFTY;
+    }
+    //if we get here, then line is neither horizontal nor vertical
+    double radians = angle*PI/180;
+    double x = grades.x[pt.x];
+    double y = grades.y[pt.y];
+
+    if( y > x*tan(radians) + offset/cos(radians) )	//then point is above line
+        return y/sin(radians) - offset/tan(radians); //project right
+
+    return x/cos(radians) + offset*tan(radians); //project up
+}//end project()
+
 //updates the persistence diagram and barcode after a change in the slice line
 void VisualizationWindow::update_persistence_diagram()
 {
@@ -298,6 +471,46 @@ void VisualizationWindow::update_persistence_diagram()
     }
 }
 
+void VisualizationWindow::right_dot_released()
+{
+    //std::cout << "UPDATED DENDROGRAM_DIAGRAM" << std::endl;
+    //update_dendrogram_diagram();
+}
+
+void VisualizationWindow::left_dot_released()
+{
+    //std::cout << "UPDATED DENDROGRAM_DIAGRAM" << std::endl;
+    //update_dendrogram_diagram();
+}
+
+void VisualizationWindow::slice_line_released()
+{
+    //std::cout << "UPDATED DENDROGRAM_DIAGRAM" << std::endl;
+    //update_dendrogram_diagram();
+}
+
+// sets xpos label for dendrogram
+void VisualizationWindow::set_xpos_box(double xpos)
+{
+    //std::cout << " ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in set_xpos_box ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^" << std::endl;
+    //std::cout << "xpos = " << xpos << std::endl;
+
+    slice_update_lock = true;
+
+    ui->xposBox->setValue(xpos);
+
+    slice_update_lock = false;
+}
+
+void VisualizationWindow::set_cluster_label(std::string cluster)
+{
+    slice_update_lock = true;
+
+    ui->clusterText->setText(QString::fromStdString(cluster));
+
+    slice_update_lock = false;
+}
+
 void VisualizationWindow::set_line_parameters(double angle, double offset)
 {
     slice_update_lock = true;
@@ -319,6 +532,12 @@ void VisualizationWindow::set_line_parameters(double angle, double offset)
     slice_update_lock = false;
 
     update_persistence_diagram();
+    qDebug() << "update_dendrogram_diagram 3";
+    if (dendrogram_arrangement_received)
+    {
+        qDebug() << "dendrogram_arrangement_received";
+        update_dendrogram_diagram();
+    }
 }
 
 void VisualizationWindow::showEvent(QShowEvent* event)

@@ -46,6 +46,8 @@ typedef boost::multiprecision::cpp_rational exact;
 typedef boost::multi_array<unsigned, 2> unsigned_matrix;
 
 #include <vector>
+#include "computing_s.h"
+#include "qnodeseditor/qnemainwindow.h"
 
 namespace Ui {
 class VisualizationWindow;
@@ -63,12 +65,19 @@ protected:
     void resizeEvent(QResizeEvent*);
     void closeEvent(QCloseEvent* event);
     QString suggestedName(QString extension);
+    //void mouseReleaseEvent(QGraphicsSceneMouseEvent *event);
 
 public slots:
     void start_computation(); //begins the computation pipeline
     void paint_template_points(std::shared_ptr<TemplatePointsMessage> points);
     void augmented_arrangement_ready(std::shared_ptr<ArrangementMessage> arrangement);
+    void dendrogram_arrangement_ready(std::shared_ptr<ArrangementMessage> dendrogram_arrangement);
     void set_line_parameters(double angle, double offset);
+    void right_dot_released();
+    void left_dot_released();
+    void slice_line_released();
+    void set_xpos_box(double xpos);
+    void set_cluster_label(std::string cluster);
 
 private slots:
     void on_angleDoubleSpinBox_valueChanged(double angle);
@@ -108,7 +117,22 @@ private:
 
     std::shared_ptr<TemplatePointsMessage> template_points; //The template points, homology dimensions, and other useful context
     std::shared_ptr<ArrangementMessage> arrangement; //pointer to the DCEL arrangement
+    std::shared_ptr<ArrangementMessage> dendrogram_arrangement; // pointer to the DCEL dendrogram arrangement
     std::unique_ptr<Barcode> barcode; //pointer to the currently-displayed barcode
+
+    //items for dendrogram diagram
+    //QNEMainWindow* dendrogram_diagram;
+    QNEMainWindow dendrogram_diagram;
+    QNodesEditor* nodesEditor;
+    bool dendrogram_arrangement_received; // true if dendrogram_arrangement has been received
+
+    // dendrogram constructor info
+    DenseGRAPH<Edge>* graph;
+    //std::unordered_map<std::pair<double,int>, Time_root> time_root_to_tr;
+    //boost::unordered::unordered_map<unsigned int, double> vertex_appearance;
+    //std::vector<std::map<int, Time_root>> time_root_to_tr;
+    Time_root last_upper_tr;
+    SimplexTree* bifiltration;
 
     //computation items
     ComputationThread cthread;
@@ -119,14 +143,22 @@ private:
     SliceDiagram slice_diagram; //subclass of QGraphicsScene, contains all of the graphics elements for the line-selection diagram
     bool slice_update_lock; //true iff slice diagram is being updated; helps avoid an infinite loop
 
+    ControlDot* dot_right;
+    ControlDot* dot_left;
+    SliceLine* slice_line;
+
     //items for persistence diagram
     PersistenceDiagram p_diagram; //subclass of QGraphicsScene, contains all of the graphics elements for the persistence diagram
     bool persistence_diagram_drawn;
 
     void update_persistence_diagram(); //updates the persistence diagram and barcode after a change in the slice line
+    void update_dendrogram_diagram();   //updates the dendrogram diagram after a change in the slice line
+
+    double project(TemplatePoint& pt, double angle, double offset);
+    void project_template_dendrogram(Time_root& tr);
 
     std::unique_ptr<Barcode> rescale_barcode_template(BarcodeTemplate& dbc, double angle, double offset,
-        std::vector<double> x_grades, std::vector<double> y_grades);
+                                                      std::vector<double> x_grades, std::vector<double> y_grades);
     double project(TemplatePoint& pt, double angle, double offset, std::vector<double> x_grades, std::vector<double> y_grades);
 
     //computes the projection of the lower-left corner of the line-selection window onto the specified line

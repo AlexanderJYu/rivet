@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dcel/arrangement_message.h"
 #include "dcel/dcel.h"
 #include <QApplication>
+#include <QString>
 #include <QMetaType>
 #include <QScopedPointer>
 #include <iostream>

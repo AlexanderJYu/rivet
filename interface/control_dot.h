@@ -33,15 +33,21 @@ class SliceLine;
 #include <QRectF>
 #include <QVariant>
 
-class ControlDot : public QGraphicsItem {
+class ControlDot : public QObject, public QGraphicsItem {
+    Q_OBJECT
 public:
-    ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* params);
-
+    //ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* params);
+    ControlDot(SliceLine* line, bool left_bottom, ConfigParameters* params, bool isRightDendrogramDot = false,
+               bool isLeftDendrogramDot = false);
     QRectF boundingRect() const;
     void paint(QPainter* painter, const QStyleOptionGraphicsItem*, QWidget*);
     QVariant itemChange(GraphicsItemChange change, const QVariant& value);
 
     void set_position(const QPointF& newpos);
+
+signals:
+    void right_dot_released();
+    void left_dot_released();
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent* event);
@@ -54,6 +60,8 @@ private:
     bool pressed;
     bool left_bottom; //TRUE if this is a left-bottom control dot, FALSE if this is a right-top control dot
     bool update_lock; //TRUE when the dot is being moved as result of external input; to avoid update loops
+    bool isRightDendrogramDot; // TRUE if this is the right-top dot in the dendrogram window
+    bool isLeftDendrogramDot; // TRUE if this is the left-bottom dot in the dendrogram window
 };
 
 #endif // CONTROL_DOT_H

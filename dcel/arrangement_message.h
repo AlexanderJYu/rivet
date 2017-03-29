@@ -46,6 +46,7 @@ public:
     }
 
     BarcodeTemplate get_barcode_template(double degrees, double offset);
+    Time_root get_dendrogram_template(double degrees, double offset);
 
     friend bool operator==(ArrangementMessage const& left, ArrangementMessage const& right);
 
@@ -119,11 +120,12 @@ private:
     struct FaceM {
         HalfedgeId boundary; //pointer to one halfedge in the boundary of this cell
         BarcodeTemplate dbc; //barcode template stored in this cell
+        Time_root tr; //dendrogram template stored in this cell
 
         template <typename Archive>
         void serialize(Archive& ar, const unsigned int /*version*/)
         {
-            ar& boundary& dbc;
+            ar& boundary& dbc& tr;
         }
     };
 

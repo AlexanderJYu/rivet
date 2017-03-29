@@ -39,6 +39,7 @@ struct Grades {
     double min_offset() const;
     double max_offset() const;
 
+    //double relative_offset_to_absolute(double offset);
 };
 
 #endif //RIVET_CONSOLE_GRADES_H

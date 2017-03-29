@@ -35,6 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "dcel/arrangement_message.h"
 #include "dcel/serialization.h"
+#include "time_root.h"
+#include "dendrogram_viz.h"
 
 static const char USAGE[] =
     R"(RIVET: Rank Invariant Visualization and Exploration Tool
@@ -53,6 +55,8 @@ static const char USAGE[] =
       rivet_console <precomputed_file> --bounds
       rivet_console <precomputed_file> --barcodes <line_file>
       rivet_console <input_file> <output_file> [-H <dimension>] [-V <verbosity>] [-x <xbins>] [-y <ybins>] [-f <format>] [--binary]
+      rivet_console <input_file> --barcodes <line_file> [-H <dimension>] [-V <verbosity>] [-x <xbins>] [-y <ybins>]
+      rivet_console <input_file> <output_file> <dendrogram_output_file> [-H <dimension>] [-V <verbosity>] [-x <xbins>] [-y <ybins>] [-f <format>] [--binary]
 
     Options:
       <input_file>                             A text file with suitably formatted point cloud, bifiltration, or
@@ -106,11 +110,11 @@ unsigned int get_uint_or_die(std::map<std::string, docopt::value>& args, const s
 }
 
 //TODO: this doesn't really belong here, look for a better place.
-void write_boost_file(InputParameters const& params, TemplatePointsMessage const& message, ArrangementMessage const& arrangement)
+void write_boost_file(InputParameters const& params, TemplatePointsMessage const& message, ArrangementMessage const& arrangement, std::string output_file)
 {
-    std::ofstream file(params.outputFile, std::ios::binary);
+    std::ofstream file(output_file, std::ios::binary);
     if (!file.is_open()) {
-        throw std::runtime_error("Could not open " + params.outputFile + " for writing.");
+        throw std::runtime_error("Could not open " + output_file + " for writing.");
     }
     file << "RIVET_1\n";
     boost::archive::binary_oarchive oarchive(file);
@@ -193,20 +197,45 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
                 return;
             }
 
-            queries.push_back(std::make_pair(angle, offset));
+            /*if (offset < 0 || offset > 1) {
+                std::clog << "Offset on line " << line_number << " must be between 0 and 1" << std::endl;
+                return;
+            }*/
+            queries.push_back(std::pair<int, double>(angle, offset));
         } else {
             std::clog << "Parse error on line " << line_number << std::endl;
             return;
         }
     }
-    Grades grades(computation_result.arrangement->x_exact, computation_result.arrangement->y_exact);
-
+    // UNCOMMENT LATER Grades grades(computation_result.arrangement->x_exact, computation_result.arrangement->y_exact);
+    auto den_arr = computation_result.dendrogram_arrangement;
     for (auto query : queries) {
         auto angle = query.first;
         auto offset = query.second;
         std::cout << angle << " " << offset << ": ";
         auto templ = computation_result.arrangement->get_barcode_template(angle, offset);
         auto barcode = templ.rescale(angle, offset, computation_result.template_points, grades);
+        //std::cout << query.first << " " << query.second << ": ";
+        //auto absolute = grades.relative_offset_to_absolute(query.second);
+        //auto templ = computation_result.arrangement->get_barcode_template(query.first, absolute);
+        //auto barcode = templ.rescale(query.first, absolute, computation_result.template_points, grades);
+
+        //auto angle = query.first;
+        //auto offset = query.second;
+        //std::cout << angle << " " << offset << ": ";
+        /* UNCOMMENT LATER
+        auto templ = computation_result.arrangement->get_barcode_template(angle, offset);
+        auto barcode = templ.rescale(angle, offset, computation_result.template_points, grades);*/
+
+        // dendrogram analogue
+        Time_root& dendro = computation_result.dendrogram_arrangement->get_dendrogram_template(angle, offset);
+        std::stringstream name;
+        name << "../../../" << query.first << "_" << query.second << ".dot";
+        Dendrogram_viz::write_dendrogram_dot_file(dendro, name.str(), den_arr->get_x_grades(), den_arr->get_y_grades());
+        std::cout << "write_dendrogram_dot_file complete" << std::endl;
+
+
+        /* UNCOMMENT LATER
         for (auto it = barcode->begin(); it != barcode->end(); it++) {
             auto bar = *it;
             std::cout << bar.birth << " ";
@@ -220,8 +249,8 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
             if (std::next(it) != barcode->end()) {
                 std::cout << ", ";
             }
-        }
-        std::cout << std::endl;
+        } 
+        std::cout << std::endl; */
     }
 }
 
@@ -275,6 +304,8 @@ int main(int argc, char* argv[])
 
     ArrangementMessage* arrangement_message = nullptr;
     TemplatePointsMessage* points_message = nullptr;
+    TemplatePointsMessage* dendrogram_points_message = nullptr;
+    ArrangementMessage* dendrogram_arrangement_message = nullptr;
 
     if (args["<input_file>"].isString()) {
         params.fileName = args["<input_file>"].asString();
@@ -287,6 +318,12 @@ int main(int argc, char* argv[])
     docopt::value& out_file_name = args["<output_file>"];
     if (out_file_name.isString()) {
         params.outputFile = out_file_name.asString();
+    }
+    docopt::value& dendrogram_out_file_name = args["<dendrogram_output_file>"];
+    debug() << "dendrogram_out_file_name = " << dendrogram_out_file_name;
+    if (dendrogram_out_file_name.isString()) {        
+        debug() << "dendrogram_out_file_name is string";
+        params.dendrogramOutputFile = dendrogram_out_file_name.asString();
     }
     params.dim = get_uint_or_die(args, "--homology");
     params.x_bins = get_uint_or_die(args, "--xbins");
@@ -356,10 +393,74 @@ int main(int argc, char* argv[])
 //        if (!(round_trip == *arrangement_message)) {
 //            throw std::runtime_error("Original and reconstituted don't match!");
 //        }
+//        if (binary) {
+//            std::cout << "ARRANGEMENT: " << params.outputFile << std::endl;
+//        } else if (verbosity > 0) {
+        //std::clog << "arrangement_ready";
+        std::stringstream ss(std::ios_base::binary | std::ios_base::out | std::ios_base::in);
+        {
+            boost::archive::binary_oarchive archive(ss);
+            archive << *arrangement_message;
+        }
+        std::clog << "Testing deserialization locally..." << std::endl;
+        std::string original = ss.str();
+        ArrangementMessage test;
+        {
+            boost::archive::binary_iarchive inarch(ss);
+            inarch >> test;
+            std::clog << "Deserialized!";
+        }
+        if (!(*arrangement_message == test)) {
+            throw std::runtime_error("Original and deserialized don't match!");
+        }
+        Arrangement reconstituted = arrangement_message->to_arrangement();
+        ArrangementMessage round_trip(reconstituted);
+        if (!(round_trip == *arrangement_message)) {
+            throw std::runtime_error("Original and reconstituted don't match!");
+        }
         if (binary) {
-            std::cout << "ARRANGEMENT: " << params.outputFile << std::endl;
-        } else if (verbosity > 0) {
+            //std::cout << "ARRANGEMENT: " << params.outputFile << std::endl;
+            std::clog << "ARRANGEMENT: " << params.outputFile << std::endl;;
+        } else {
             std::clog << "Wrote arrangement to " << params.outputFile << std::endl;
+        }
+        //std::clog << "reached end of arrangement_ready signal handler";
+    });
+    computation.dendrogram_arrangement_ready.connect([&dendrogram_arrangement_message, &params, &binary](std::shared_ptr<Arrangement> dendrogram_arrangement) {
+        std::clog << "dendrogram_arrangement_ready";
+        dendrogram_arrangement_message = new ArrangementMessage(*dendrogram_arrangement);
+        //TODO: this should become a system test with a known dataset
+        //Note we no longer write the arrangement to stdout, it goes to a file at the end
+        //of the run. This message just announces the absolute path of the file.
+        //The viewer should capture the file name from the stdout stream, and
+        //then wait for the console program to finish before attempting to read the file.
+        //std::clog << "created dendrogram_arrangement_message";
+        std::stringstream ss(std::ios_base::binary | std::ios_base::out | std::ios_base::in);
+        {
+            boost::archive::binary_oarchive archive(ss);
+            archive << *dendrogram_arrangement_message;
+        }
+        std::clog << "Testing deserialization locally..." << std::endl;
+        std::string original = ss.str();
+        ArrangementMessage test;
+        {
+            boost::archive::binary_iarchive inarch(ss);
+            inarch >> test;
+            std::clog << "Deserialized!";
+        }
+        if (!(*dendrogram_arrangement_message == test)) {
+            throw std::runtime_error("Original and deserialized don't match!");
+        }
+        Arrangement reconstituted = dendrogram_arrangement_message->to_arrangement();
+        ArrangementMessage round_trip(reconstituted);
+        if (!(round_trip == *dendrogram_arrangement_message)) {
+            throw std::runtime_error("Original and reconstituted don't match!");
+        }
+        if (binary) {
+            //std::cout << "ARRANGEMENT: " << params.outputFile << std::endl;
+            std::clog << "DENDROGRAM ARRANGEMENT: " << params.dendrogramOutputFile << std::endl;
+        } else {
+            std::clog << "Wrote arrangement to " << params.dendrogramOutputFile << std::endl;
         }
     });
     computation.template_points_ready.connect([&points_message, &binary, &betti_only, &verbosity](TemplatePointsMessage message) {
@@ -403,6 +504,56 @@ int main(int argc, char* argv[])
         }
     });
 
+    computation.dendrogram_template_points_ready.connect([&dendrogram_points_message, &binary, &betti_only, &verbosity](TemplatePointsMessage dendrogram_message) {
+        dendrogram_points_message = new TemplatePointsMessage(dendrogram_message);
+
+        if (binary) {
+            std::cout << "XI" << std::endl;
+            {
+                boost::archive::text_oarchive archive(std::cout);
+                archive << dendrogram_message;
+            }
+            std::cout << "END XI" << std::endl;
+            std::cout.flush();
+        }
+
+        if (verbosity >= 4 || betti_only) {
+            FileWriter::write_grades(std::cout, dendrogram_message.x_exact, dendrogram_message.y_exact);
+        }
+        //TODO: Add a flag to re-enable this code?
+        //        std::stringstream ss;
+        //        {
+        //            std::cerr << "Local deserialization test" << std::endl;
+        //            boost::archive::text_oarchive out(ss);
+        //            out << message;
+        //        }
+        //        {
+        //            boost::archive::text_iarchive in(ss);
+        //            TemplatePointsMessage result;
+        //            in >> result;
+        //            if (!(message == result)) {
+        //                throw std::runtime_error("Original TemplatePointsMessage and reconstituted don't match!");
+        //            }
+        //        }
+        if (betti_only) {
+            print_dims(dendrogram_message, std::cout);
+            std::cout << std::endl;
+            print_betti(dendrogram_message, std::cout);
+            std::cout.flush();
+            //TODO: this seems a little abrupt...
+            exit(0);
+        }
+    });
+
+    std::unique_ptr<InputData> input;
+    try {
+        input = inputManager.start(progress);
+    } catch (const std::exception& e) {
+        std::cerr << "INPUT ERROR: " << e.what() << " :END" << std::endl;
+        std::cerr << "Exiting" << std::endl
+                  << std::flush;
+        return 1;
+    }
     if (identify) {
         auto file_type = inputManager.identify();
         std::cout << "FILE TYPE: " << file_type.identifier << std::endl;
@@ -461,6 +612,61 @@ int main(int argc, char* argv[])
                 } else {
                     throw std::runtime_error("Unsupported output format: " + params.outputFormat);
                 }
+    if (params.verbosity >= 4) {
+        debug() << "Input processed.";
+    }
+    auto result = computation.compute(*input);
+    if (params.verbosity >= 2) {
+        debug() << "Computation complete; augmented arrangement ready.";
+    }
+
+    /* UNCOMMENT LATER
+    auto arrangement = result->arrangement;
+    if (params.verbosity >= 4) {
+        arrangement->print_stats();
+    }*/
+
+    auto dendrogram_arrangement = result->dendrogram_arrangement;
+    if (params.verbosity >= 4) {
+        dendrogram_arrangement->print_stats();
+    }
+
+    if (!slices.empty()) {
+        process_barcode_queries(slices, *result);
+        return 0;
+    }
+    //if an output file has been specified, then save the arrangement
+    /* UNCOMMENT LATER
+    if (!params.outputFile.empty()) {
+        std::ofstream file(params.outputFile);
+        if (file.is_open()) {
+            debug() << "Writing file:" << params.outputFile;
+
+            if (params.outputFormat == "R0") {
+                FileWriter fw(params, *input, *(arrangement), result->template_points);
+                fw.write_augmented_arrangement(file);
+            } else if (params.outputFormat == "R1") {
+                write_boost_file(params, *points_message, *arrangement_message, params.outputFile);
+            } else {
+                throw std::runtime_error("Unsupported output format: " + params.outputFormat);
+            }
+        } else {
+            std::stringstream ss;
+            ss << "Error: Unable to write file:" << params.outputFile;
+            throw std::runtime_error(ss.str());
+        }
+    }*/
+
+    if (!params.dendrogramOutputFile.empty()) {
+        std::ofstream file(params.dendrogramOutputFile);
+        if (file.is_open()) {
+            debug() << "Writing file:" << params.dendrogramOutputFile;
+
+            if (params.outputFormat == "R0") {
+                FileWriter fw(params, *input, *(dendrogram_arrangement), result->dendrogram_template_points);
+                fw.write_augmented_arrangement(file);
+            } else if (params.outputFormat == "R1") {
+                write_boost_file(params, *dendrogram_points_message, *dendrogram_arrangement_message, params.dendrogramOutputFile);
             } else {
                 std::stringstream ss;
                 ss << "Error: Unable to write file:" << params.outputFile;

@@ -1,3 +1,4 @@
+
 cmake_minimum_required (VERSION 3.1)
 project (rivet_console)
 set (CMAKE_CXX_STANDARD 11)
@@ -39,8 +40,8 @@ add_executable (rivet_console
         dcel/arrangement_message.cpp
         math/map_matrix.cpp
         math/multi_betti.cpp
-	math/bifiltration_data.cpp
-	math/firep.cpp
+        math/bifiltration_data.cpp
+        math/firep.cpp
         math/template_point.cpp
         math/template_points_matrix.cpp
         math/index_matrix.cpp
@@ -71,8 +72,8 @@ add_executable(unit_tests
         dcel/dcel.cpp
         math/map_matrix.cpp
         math/multi_betti.cpp
-	math/bifiltration_data.cpp
-	math/firep.cpp
+        math/bifiltration_data.cpp
+        math/firep.cpp
         math/template_point.cpp
         math/template_points_matrix.cpp
         math/index_matrix.cpp

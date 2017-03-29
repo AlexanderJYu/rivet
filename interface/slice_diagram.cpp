@@ -305,7 +305,7 @@ void SliceDiagram::resize_diagram()
     redraw_dots();
 
     //reposition slice line
-    slice_line->update_bounds(diagram_width, diagram_height, padding);
+    slice_line->update_bounds(diagram_width, diagram_height, padding, 0);
 
     double x = 0, y = 0;
     if (line_pos < 0) //then left-bottom endpoint is along bottom edge of box

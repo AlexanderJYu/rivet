@@ -201,9 +201,19 @@ BarcodeTemplate& Face::get_barcode()
     return dbc;
 }
 
+Time_root& Face::get_dendrogram()
+{
+    return tr;
+}
+
 void Face::set_barcode(const BarcodeTemplate& bt)
 {
     dbc = bt; ///TODO: is this good design???
+}
+
+void Face::set_dendrogram(const Time_root& den)
+{
+    tr = den;
 }
 
 bool Face::has_been_visited()

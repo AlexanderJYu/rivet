@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 class Halfedge;
 
 #include "barcode_template.h"
+#include "time_root.h"
 #include <math/template_point.h>
 #include <memory>
 #include <numerics.h>
@@ -116,8 +117,9 @@ public:
     std::shared_ptr<Halfedge> get_boundary(); //get the (pointer to the) boundary halfedge
 
     BarcodeTemplate& get_barcode(); //returns a reference to the barcode template stored in this cell
+    Time_root& get_dendrogram(); //returns a reference to the dendrogram template stored in this cell
     void set_barcode(const BarcodeTemplate& bt); //stores (a copy of) the specified barcode template in this cell
-
+    void set_dendrogram(const Time_root& den); // stores (a copy of) the specified dendrogram template in this cell
     bool has_been_visited(); //true iff cell has been visited in the vineyard-update process (so that we can distinguish a cell with an empty barcode from an unvisited cell)
     void mark_as_visited(); //marks this cell as visited
 
@@ -131,6 +133,7 @@ public:
 private:
     std::shared_ptr<Halfedge> boundary; //pointer to one halfedge in the boundary of this cell
     BarcodeTemplate dbc; //barcode template stored in this cell
+    Time_root tr; //root of dendrogram template stored in this cell
     bool visited; //initially false, set to true after this cell has been visited in the vineyard-update process (so that we can distinguish a cell with an empty barcode from an unvisited cell)
     unsigned long identifier; // Arrangement-specific ID for this face
 }; //end class Face
