@@ -41,6 +41,8 @@ FIRep::FIRep(BifiltrationData& bd, int v)
     //Create the boundary matrices and index lists
     //First start in dim-1
     std::vector<AppearanceGrades*> low_simplices;
+    std::cout << "create low_simplices" << std::endl;
+    std::cout << "hom_dim = " << hom_dim << std::endl;
     SimplexInfo* simplices = bd.getSimplices(hom_dim - 1);
     SimplexInfo::iterator it;
     for(it = simplices->begin(); it != simplices->end(); it++)
@@ -94,7 +96,11 @@ FIRep::FIRep(BifiltrationData& bd, int v)
 
     //Now to make the boundary matrix
     //create the MapMatrix
+    std::cout << "CREATE boundary_mx_0" << std::endl;
     boundary_mx_0 = new MapMatrix(low_simplices.size(), mid_simplex_grades.size());
+    std::cout << "low_simplices.size() = " << low_simplices.size() << std::endl;
+    std::cout << "mid_simplex_grades.size() = " << mid_simplex_grades.size() << std::endl;
+    std::cout << "boundary_mx_0->height() = " << boundary_mx_0->height() << std::endl;
 
     //loop through simplices, writing columns to the matrix
     for (it = simplices->begin(); it != simplices->end(); it++)
@@ -104,6 +110,8 @@ FIRep::FIRep(BifiltrationData& bd, int v)
             write_boundary_column(boundary_mx_0, it->first, bd.getSimplices(hom_dim - 1), (*it2).dim_index);
         }
     }
+    std::cout << "boundary_mx_0->height() = " << boundary_mx_0->height() << std::endl;
+
 
     //Finally deal with dimension dim+1
     //structure which maintains what the boundary of a grade is (in the case of the relations)
@@ -254,9 +262,13 @@ MapMatrix* FIRep::get_boundary_mx(int dim)
 //    num_simplices is the number of simplices in the order (i.e., the number of entries in the vector that are NOT -1)
 MapMatrix_Perm* FIRep::get_boundary_mx(std::vector<int>& coface_order, unsigned num_simplices)
 {
+    std::cout << "in get_boundary_mx 2 parameters" << std::endl;
     //create the matrix
-    MapMatrix_Perm* mat = new MapMatrix_Perm(boundary_mx_0->height(), num_simplices);
+    std::cout << "num_simplices = " << num_simplices << std::endl;
+    std::cout << "boundary_mx_0->height() = " << boundary_mx_0->height() << std::endl;
 
+    MapMatrix_Perm* mat = new MapMatrix_Perm(boundary_mx_0->height(), num_simplices);
+    std::cout << "made mat" << std::endl;
     //loop through all simplices, writing columns to the matrix
     for (unsigned i = 0; i < boundary_mx_0->width(); i++)
     {

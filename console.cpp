@@ -207,7 +207,7 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
             return;
         }
     }
-    // UNCOMMENT LATER Grades grades(computation_result.arrangement->x_exact, computation_result.arrangement->y_exact);
+    Grades grades(computation_result.arrangement->x_exact, computation_result.arrangement->y_exact);
     auto den_arr = computation_result.dendrogram_arrangement;
     for (auto query : queries) {
         auto angle = query.first;
@@ -223,9 +223,9 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
         //auto angle = query.first;
         //auto offset = query.second;
         //std::cout << angle << " " << offset << ": ";
-        /* UNCOMMENT LATER
-        auto templ = computation_result.arrangement->get_barcode_template(angle, offset);
-        auto barcode = templ.rescale(angle, offset, computation_result.template_points, grades);*/
+        
+        //auto templ = computation_result.arrangement->get_barcode_template(angle, offset);
+        //auto barcode = templ.rescale(angle, offset, computation_result.template_points, grades);
 
         // dendrogram analogue
         Time_root& dendro = computation_result.dendrogram_arrangement->get_dendrogram_template(angle, offset);
@@ -234,8 +234,6 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
         Dendrogram_viz::write_dendrogram_dot_file(dendro, name.str(), den_arr->get_x_grades(), den_arr->get_y_grades());
         std::cout << "write_dendrogram_dot_file complete" << std::endl;
 
-
-        /* UNCOMMENT LATER
         for (auto it = barcode->begin(); it != barcode->end(); it++) {
             auto bar = *it;
             std::cout << bar.birth << " ";
@@ -250,7 +248,7 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
                 std::cout << ", ";
             }
         } 
-        std::cout << std::endl; */
+        std::cout << std::endl;
     }
 }
 
@@ -408,7 +406,7 @@ int main(int argc, char* argv[])
         {
             boost::archive::binary_iarchive inarch(ss);
             inarch >> test;
-            std::clog << "Deserialized!";
+            std::clog << "Deserialized!" << std::endl;;
         }
         if (!(*arrangement_message == test)) {
             throw std::runtime_error("Original and deserialized don't match!");
@@ -446,7 +444,7 @@ int main(int argc, char* argv[])
         {
             boost::archive::binary_iarchive inarch(ss);
             inarch >> test;
-            std::clog << "Deserialized!";
+            std::clog << "Deserialized!" << std::endl;
         }
         if (!(*dendrogram_arrangement_message == test)) {
             throw std::runtime_error("Original and deserialized don't match!");
@@ -548,6 +546,7 @@ int main(int argc, char* argv[])
     std::unique_ptr<InputData> input;
     try {
         input = inputManager.start(progress);
+        std::cout << "INPUT MANAGER STARTED" << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "INPUT ERROR: " << e.what() << " :END" << std::endl;
         std::cerr << "Exiting" << std::endl
@@ -562,6 +561,7 @@ int main(int argc, char* argv[])
         std::cout.flush();
         return 0;
     }
+    /*
     std::unique_ptr<ComputationResult> result;
 
     if (barcodes || bounds) {
@@ -608,23 +608,24 @@ int main(int argc, char* argv[])
                     FileWriter fw(params, *input, *(arrangement), result->template_points);
                     fw.write_augmented_arrangement(file);
                 } else if (params.outputFormat == "R1") {
-                    write_boost_file(params, *points_message, *arrangement_message);
+                    write_boost_file(params, *points_message, *arrangement_message,params.outputFile);
                 } else {
                     throw std::runtime_error("Unsupported output format: " + params.outputFormat);
-                }
+                }}}}
+
     if (params.verbosity >= 4) {
         debug() << "Input processed.";
-    }
+    }*/
+    
     auto result = computation.compute(*input);
     if (params.verbosity >= 2) {
         debug() << "Computation complete; augmented arrangement ready.";
     }
 
-    /* UNCOMMENT LATER
     auto arrangement = result->arrangement;
     if (params.verbosity >= 4) {
         arrangement->print_stats();
-    }*/
+    }
 
     auto dendrogram_arrangement = result->dendrogram_arrangement;
     if (params.verbosity >= 4) {
@@ -636,7 +637,7 @@ int main(int argc, char* argv[])
         return 0;
     }
     //if an output file has been specified, then save the arrangement
-    /* UNCOMMENT LATER
+    
     if (!params.outputFile.empty()) {
         std::ofstream file(params.outputFile);
         if (file.is_open()) {
@@ -655,7 +656,7 @@ int main(int argc, char* argv[])
             ss << "Error: Unable to write file:" << params.outputFile;
             throw std::runtime_error(ss.str());
         }
-    }*/
+    }
 
     if (!params.dendrogramOutputFile.empty()) {
         std::ofstream file(params.dendrogramOutputFile);
@@ -679,3 +680,5 @@ int main(int argc, char* argv[])
     }
     return 0;
 }
+
+

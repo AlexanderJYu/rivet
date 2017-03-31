@@ -146,8 +146,8 @@ void MultiBetti::compute(unsigned_matrix& hom_dims, Progress& progress)
     bdry2m->remove_zero_cols(ind2, ind2m);
 
     //clean up
-    delete bdry2;
-    delete ind2;
+    //delete bdry2;
+    //delete ind2;
 
     //emit progress message
     progress.progress(40);
@@ -296,7 +296,7 @@ void MultiBetti::compute(unsigned_matrix& hom_dims, Progress& progress)
     progress.progress(95);
 
     //clean up
-    delete bdry1;
+    //delete bdry1;
     delete ind1;
     delete bdry2m;
     delete ind2m;

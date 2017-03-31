@@ -55,7 +55,7 @@ public:
     //also stores ordered list of xi support points in the supplied vector
     //precondition: the constructor has already created the boundary of the arrangement
     std::shared_ptr<Arrangement> build_arrangement(
-        SimplexTree& bif, BifiltrationData& bif_data,
+        /*SimplexTree& bif,*/ BifiltrationData& bif_data,
         std::vector<exact> x_exact,
         std::vector<exact> y_exact,
         std::vector<TemplatePoint>& template_points,

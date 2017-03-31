@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "input_manager.h"
 #include "../computation.h"
-#include "../math/simplex_tree.h"
 #include "../math/bifiltration_data.h"
 #include "file_input_reader.h"
 #include "input_parameters.h"
@@ -134,6 +133,9 @@ FileType& InputManager::get_file_type(std::string fileName)
         throw std::runtime_error("Could not open " + fileName);
     }
     FileInputReader reader(stream);
+    if (!reader.has_next_line()) {
+        throw std::runtime_error("Empty file: " + fileName);
+    }
     std::string filetype_name = reader.next_line().first[0];
 
     auto it = std::find_if(supported_types.begin(), supported_types.end(), [filetype_name](FileType t) { return t.identifier == filetype_name; });
@@ -152,10 +154,7 @@ std::unique_ptr<InputData> InputManager::start(Progress& progress)
 {
     //read the file
     if (verbosity >= 2) {
-        std::ostringstream oss;
-        oss << "READING FILE:" << input_params.fileName;
-        //debug() << "READING FILE:" << input_params.fileName;
-        debug() << oss.str().c_str();
+        debug() << "READING FILE:" << input_params.fileName.c_str();
     }
     auto file_type = get_file_type(input_params.fileName);
     std::ifstream infile(input_params.fileName); //input file
@@ -836,23 +835,23 @@ std::unique_ptr<InputData> InputManager::read_brips(std::ifstream& stream, Progr
             }
 
             //read vertices
-            unsigned dim = 0;
+            unsigned pos = 0;
             std::vector<int> verts;
-            while(tokens[dim].at(0) != ';') {
-                int v = std::stoi(tokens[dim]);
+            while(tokens[pos].at(0) != ';') {
+                int v = std::stoi(tokens[pos]);
                 verts.push_back(v);
-                dim++;
+                pos++;
             }
-
-            unsigned grades = (tokens.size() - dim) / 2; //remaining tokens are xy pairs
-
+            pos++;
+            unsigned grades = (tokens.size() - pos) / 2; //remaining tokens are xy pairs
             for (unsigned i = 0; i < grades; i++) {
                 //read multigrade and remember that it corresponds to this grade
-                ret = x_set.insert(new ExactValue(str_to_exact(tokens.at(dim + 1))));
+                ret = x_set.insert(new ExactValue(str_to_exact(tokens.at(pos))));
                 (*(ret.first))->indexes.push_back(num_grades);
-                ret = y_set.insert(new ExactValue(str_to_exact(tokens.at(dim + 2))));
+                ret = y_set.insert(new ExactValue(str_to_exact(tokens.at(pos + 1))));
                 (*(ret.first))->indexes.push_back(num_grades);
                 num_grades++;
+                pos += 2;
             }
 
             simplexList.push_back({verts, grades});
@@ -883,6 +882,10 @@ std::unique_ptr<InputData> InputManager::read_brips(std::ifstream& stream, Progr
             current_grade++;
         }
         data->bifiltration_data->add_simplex(it->first, gradesOfApp);
+    }
+    if (verbosity >= 10)
+    {
+        data->bifiltration_data->print_bifiltration();
     }
     data->bifiltration_data->createGradeInfo();
     data->bifiltration_data->set_xy_grades(data->x_exact.size(), data->y_exact.size());

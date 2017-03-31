@@ -723,6 +723,7 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
             continue;
         }
 
+
         //boost::unordered::unordered_map<int, Time_root> K;
         //enum V_type {L, i_minus_1, i_plus_1, U};
         //boost::unordered::unordered_map<V_type, Time_root>
@@ -747,6 +748,28 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
             std::cout << "it_i_plus_1 is defined" << std::endl;
             it_i_plus_1 = std::next(it_prime,1);
             it_i_plus_1_exists = true;
+        }
+
+        // step -1
+        if (it_i_minus_1_exists)
+        {
+            if (T_cur.bigrade <= get_bigrade(*it_i_minus_1))
+            {
+                current_face->mark_as_visited();
+                cur_anchor->toggle(); // we need to remember we crossed cur_anchor (as we do in step 8)
+                face_to_zs[current_face] = next_zs;
+                Time_root& den_template = current_face->get_dendrogram();
+                Time_root template_tr = T_cur;
+                //populate_num_leaves_and_birth_label_str(den_template);
+
+                bool is_isomorphic = compare_template_to_naive_dendrogram(next_zs, template_tr);
+                if (!is_isomorphic)
+                    throw std::runtime_error("dendrograms are not isomorphic!");
+
+                den_template = T_cur; // no need to reset T_cur since its same
+                cur_zs = next_zs;
+                continue;
+            }
         }
 
         // step 0
@@ -1138,13 +1161,12 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
             Time_root& den_template = cur_face->get_dendrogram();
             populate_num_leaves_and_birth_label_str(den_template);
 
+            /*
             // Testing correctness of algorithm by comparing naive vs templates
             std::cout << " %%%%%%%%%% testing correctness of algorithm %%%%%%%%%%" << std::endl;
 
             Time_root naive_tr = compute_dendrogram_template(next_zs);
             Time_root template_tr = cur_face->get_dendrogram();
-
-
 
             std::cout << "populate_ordered_component_label(naive_tr)" << std::endl;
             populate_ordered_component_label(naive_tr);
@@ -1153,10 +1175,12 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
             std::cout << "print naive_tr: " << std::endl;
             Time_root::recursively_print_tr(naive_tr);
             std::cout << "print template tr: " << std::endl;
-            Time_root::recursively_print_tr(template_tr);
+            Time_root::recursively_print_tr(template_tr);*/
 
+            Time_root template_tr = cur_face->get_dendrogram();
+            bool is_isomorphic = compare_template_to_naive_dendrogram(next_zs, template_tr);
 
-            bool is_isomorphic = is_dendrogram_isomorphic(naive_tr,template_tr);
+            //bool is_isomorphic = is_dendrogram_isomorphic(naive_tr,template_tr);
 
             std::cout << "is_isomorphic = " << is_isomorphic << std::endl;
             if (!is_isomorphic)
@@ -1179,6 +1203,27 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
 
     // restore buffer
     //std::cout.rdbuf(orig_buf);
+}
+
+bool PersistenceUpdater::compare_template_to_naive_dendrogram(zeta_seq next_zs,
+                                                             Time_root& template_tr)
+{
+    // Testing correctness of algorithm by comparing naive vs templates
+    std::cout << " %%%%%%%%%% compare_template_to_naive_dendrogram %%%%%%%%%%" << std::endl;
+
+    Time_root naive_tr = compute_dendrogram_template(next_zs);
+    //Time_root template_tr = cur_face->get_dendrogram();
+
+    std::cout << "populate_ordered_component_label(naive_tr)" << std::endl;
+    populate_ordered_component_label(naive_tr);
+    std::cout << "populate_ordered_component_label(template_tr)" << std::endl;
+    populate_ordered_component_label(template_tr);
+    std::cout << "print naive_tr: " << std::endl;
+    Time_root::recursively_print_tr(naive_tr);
+    std::cout << "print template tr: " << std::endl;
+    Time_root::recursively_print_tr(template_tr);
+
+    return is_dendrogram_isomorphic(naive_tr,template_tr);
 }
 
 // populate num_leaves and birth_label_str
@@ -1813,28 +1858,36 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
     if (verbosity >= 10) {
         debug() << "  Mapping low simplices:";
     }
+    std::cout << "break 1" << std::endl;
     IndexMatrix* ind_low = bifiltration.get_index_mx(dim); //can we improve this with something more efficient than IndexMatrix?
+    std::cout << "break 2" << std::endl;
     store_multigrades(ind_low, true);
+    std::cout << "break 3" << std::endl;
 
     if (verbosity >= 10) {
         debug() << "  Mapping high simplices:";
     }
     IndexMatrix* ind_high = bifiltration.get_index_mx(dim + 1); //again, could be improved?
+    std::cout << "break 4" << std::endl;
     store_multigrades(ind_high, false);
+    std::cout << "break 5" << std::endl;
 
     //get the proper simplex ordering
     std::vector<int> low_simplex_order; //this will be a map : dim_index --> order_index for dim-simplices; -1 indicates simplices not in the order
     unsigned num_low_simplices = build_simplex_order(ind_low, true, low_simplex_order);
     delete ind_low;
+    std::cout << "break 5.1" << std::endl;
 
     std::vector<int> high_simplex_order; //this will be a map : dim_index --> order_index for (dim+1)-simplices; -1 indicates simplices not in the order
     unsigned num_high_simplices = build_simplex_order(ind_high, false, high_simplex_order);
     delete ind_high;
+    std::cout << "break 5.2" << std::endl;
 
     //get boundary matrices (R) and identity matrices (U) for RU-decomposition
     R_low = bifiltration.get_boundary_mx(low_simplex_order, num_low_simplices);
+    std::cout << "break 5.25" << std::endl;
     R_high = bifiltration.get_boundary_mx(low_simplex_order, num_low_simplices, high_simplex_order, num_high_simplices);
-
+    std::cout << "break 5.3" << std::endl;
     //print runtime data
     if (verbosity >= 4) {
         debug() << "  --> computing initial order on simplices and building the boundary matrices took"
@@ -1845,6 +1898,7 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
     timer.restart();
     MapMatrix_Perm* R_low_initial = new MapMatrix_Perm(*R_low);
     MapMatrix_Perm* R_high_initial = new MapMatrix_Perm(*R_high);
+    std::cout << "break 5.4" << std::endl;
     if (verbosity >= 4) {
         debug() << "  --> copying the boundary matrices took"
                 << timer.elapsed() << "milliseconds";
@@ -1855,6 +1909,7 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
     inv_perm_low.resize(R_low->width());
     perm_high.resize(R_high->width());
     inv_perm_high.resize(R_high->width());
+    std::cout << "break 5.5" << std::endl;
     for (unsigned j = 0; j < perm_low.size(); j++) {
         perm_low[j] = j;
         inv_perm_low[j] = j;
@@ -1863,6 +1918,7 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
         perm_high[j] = j;
         inv_perm_high[j] = j;
     }
+    std::cout << "break 6" << std::endl;
 
     // PART 2: INITIAL PERSISTENCE COMPUTATION (RU-decomposition)
 
@@ -1884,7 +1940,7 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
     if (verbosity >= 4) {
         debug() << "Initial persistence computation in cell " << arrangement.FID(first_cell);
     }
-
+    std::cout << "break 7" << std::endl;
     // PART 3: TRAVERSE THE PATH AND UPDATE PERSISTENCE AT EACH STEP
 
     if (verbosity >= 2) {
@@ -2080,8 +2136,8 @@ void PersistenceUpdater::store_barcodes_with_reset(std::vector<std::shared_ptr<H
 
     // PART 4: CLEAN UP
 
-    delete R_low;
-    delete R_high;
+    //delete R_low;
+    //delete R_high;
     delete U_low;
     delete U_high;
 

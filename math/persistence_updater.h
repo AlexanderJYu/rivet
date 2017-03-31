@@ -137,11 +137,7 @@ public:
     bool is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2);
     Time_root compute_dendrogram_template(zeta_seq& zs);
     void relabel_dendrogram_with_oracle(Time_root& tr);
-
-
-
-
-
+    bool compare_template_to_naive_dendrogram(zeta_seq next_zs, Time_root& template_tr);
 
     //functions to compute and store dendrogram templates in each 2-cell of the arrangement
     void store_dendrogram_templates(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress);

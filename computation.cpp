@@ -73,6 +73,8 @@ std::unique_ptr<ComputationResult> Computation::compute_raw(ComputationInput& in
         debug() << "COMPUTING xi_0, xi_1, AND xi_2 FOR HOMOLOGY DIMENSION " << params.dim << ":";
     }
     FIRep rep(input.bifiltration(), verbosity);
+    std::cout << "COMPUTE mb" << std::endl;
+    std::cout << "params.dim = " << params.dim << std::endl;
     MultiBetti mb(rep, params.dim);
     Timer timer;
     mb.compute(result->homology_dimensions, progress);
@@ -120,11 +122,13 @@ std::unique_ptr<ComputationResult> Computation::compute_raw(ComputationInput& in
 
     timer.restart();
     ArrangementBuilder builder(verbosity);
+    std::cout << "about to build barcode arrangement" << std::endl;
     auto arrangement = builder.build_arrangement(mb, input.x_exact, input.y_exact, result->template_points, progress); ///TODO: update this -- does not need to store list of xi support points in xi_support
     // build dendrogram_arrangement
+    std::cout << "finished building barcode arrangement" << std::endl;
     ArrangementBuilder dendrogram_builder(verbosity);
-    SimplexTree dummy_tree(0,0);
-    auto dendrogram_arrangement = dendrogram_builder.build_arrangement(dummy_tree, *bif, input.x_exact, input.y_exact, S_as_template_pts, progress, oracle, cs);
+    //SimplexTree dummy_tree(0,0);
+    auto dendrogram_arrangement = dendrogram_builder.build_arrangement(*bif, input.x_exact, input.y_exact, S_as_template_pts, progress, oracle, cs);
     //NOTE: this also computes and stores barcode templates in the arrangement
 
     if (verbosity >= 2) {
@@ -237,8 +241,8 @@ std::unique_ptr<ComputationResult> Computation::dendrogram_compute_raw(Computati
     //auto arrangement = builder.build_arrangement(mb, input.x_exact, input.y_exact, result->template_points, progress); ///TODO: update this -- does not need to store list of xi support points in xi_support
     // build dendrogram_arrangement
     ArrangementBuilder dendrogram_builder(verbosity);
-    SimplexTree dummy_tree(0,0);
-    auto dendrogram_arrangement = dendrogram_builder.build_arrangement(dummy_tree, *bif, input.x_exact, input.y_exact, S_as_template_pts, progress, oracle, cs);
+    //SimplexTree dummy_tree(0,0);
+    auto dendrogram_arrangement = dendrogram_builder.build_arrangement(*bif, input.x_exact, input.y_exact, S_as_template_pts, progress, oracle, cs);
     //NOTE: this also computes and stores barcode templates in the arrangement
     /*
     if (verbosity >= 2) {
@@ -277,6 +281,6 @@ std::unique_ptr<ComputationResult> Computation::compute(InputData data)
     auto input = ComputationInput(data);
     //print bifiltration statistics
     //debug() << "Computing from raw data";
-    // return compute_raw(input);
-    return dendrogram_compute_raw(input);
+    return compute_raw(input);
+    // return dendrogram_compute_raw(input);
 }

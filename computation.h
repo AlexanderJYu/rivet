@@ -74,7 +74,7 @@ struct ComputationResult {
     std::shared_ptr<Arrangement> arrangement;
 
     std::shared_ptr<Arrangement> dendrogram_arrangement;
-    std::shared_ptr<SimplexTree> bifiltration;
+    // std::shared_ptr<SimplexTree> bifiltration;
     // UNCOMMENT LATER MAYBE std::shared_ptr<BifiltrationData> bifiltration_data;
 };
 

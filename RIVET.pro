@@ -78,7 +78,8 @@ SOURCES	+= main.cpp                         \
     qnodeseditor/qnemainwindow.cpp \
     qnodeseditor/qneport.cpp \
     qnodeseditor/qnodeseditor.cpp \
-    math/bifiltration_data.cpp
+    math/bifiltration_data.cpp \
+    math/firep.cpp
 
 
 HEADERS  += visualizationwindow.h			\
@@ -138,7 +139,8 @@ HEADERS  += visualizationwindow.h			\
     qnodeseditor/qneconnection.h \
     qnodeseditor/qneport.h \
     qnodeseditor/qneblock.h \
-    math/bifiltration_data.h
+    math/bifiltration_data.h \
+    math/firep.h
 
 FORMS   += visualizationwindow.ui			\
 		dataselectdialog.ui \

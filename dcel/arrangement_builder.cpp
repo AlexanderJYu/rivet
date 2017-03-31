@@ -72,7 +72,9 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(
     std::shared_ptr<Arrangement> arrangement(new Arrangement(x_exact, y_exact, verbosity));
     BifiltrationData dummy_data(0,0);
     FIRep dummy_tree(dummy_data, 0);
+    std::cout << "Construct updater for dendrogram updates" << std::endl;
     PersistenceUpdater updater(*arrangement, dummy_tree, bif_data, template_points, verbosity); //PersistenceUpdater object is able to do the calculations necessary for finding anchors and computing dendrogram templates
+    std::cout << "Finished constructing updater for dendrogram updates" << std::endl;
     updater.set_oracle(oracle);
     updater.set_cs(cs);
     if (verbosity >= 2) {
@@ -137,7 +139,9 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(
     progress.progress(10);
     BifiltrationData dummy_data(0,0); // to satisfy constructor
     std::shared_ptr<Arrangement> arrangement(new Arrangement(x_exact, y_exact, verbosity));
+    std::cout << "Construct updater for barcode updates" << std::endl;
     PersistenceUpdater updater(*arrangement, mb.bifiltration, dummy_data, template_points, verbosity); //PersistenceUpdater object is able to do the calculations necessary for finding anchors and computing barcode templates
+    std::cout << "Finished constructing updater for barcode updates" << std::endl;
 
     if (verbosity >= 2) {
         debug() << "Anchors found; this took " << timer.elapsed() << " milliseconds.";
@@ -146,7 +150,9 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(
     //now that we have all the anchors, we can build the interior of the arrangement
     progress.progress(25);
     timer.restart();
+    std::cout << "Construct interior of barcode arrangement" << std::endl;
     build_interior(arrangement);
+    std::cout << "Finished constructing interior" << std::endl;
     if (verbosity >= 2) {
         debug() << "Line arrangement constructed; this took " << timer.elapsed() << " milliseconds.";
         if (verbosity >= 4) {
@@ -177,8 +183,9 @@ std::shared_ptr<Arrangement> ArrangementBuilder::build_arrangement(
     progress.setProgressMaximum(path.size());
 
     //finally, we can traverse the path, computing and storing a barcode template in each 2-cell
+    std::cout << "store barcodes with reset" << std::endl;
     updater.store_barcodes_with_reset(path, progress);
-
+    std::cout << "about to return from building barcode arrangement" << std::endl;
     return arrangement;
 
 } //end build_arrangement()
