@@ -177,13 +177,14 @@ bool PersistenceUpdater::bigradeComparator(const std::pair<double,double> b1,
     return (b1.first < b2.first) || ((b1.first == b2.first) && (b1.second < b2.second));
 }*/
 
-
+// comparator used to locate query elements in a zeta_seq
 bool PersistenceUpdater::zsComparator(const std::shared_ptr<TemplatePointsMatrixEntry> e,
                                       const std::shared_ptr<TemplatePointsMatrixEntry> f)
 {
     return (e->x < f->x) || (e->x == f->x && e->y < f->y);
 }
 
+// true iff dendrograms rooted at tr1 and tr2 are isomorphic
 bool PersistenceUpdater::is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2)
 {
     //std::string comp_label_1 = int_set_to_string(tr1.ordered_component_label);
@@ -227,6 +228,7 @@ bool PersistenceUpdater::is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2
     return is_isomorphic;
 }
 
+// populate the component_label field of a dendrogram rooted at tr
 std::set<int> PersistenceUpdater::populate_ordered_component_label(Time_root& tr)
 {
     for (int v : tr.birth_label)
@@ -241,6 +243,7 @@ std::set<int> PersistenceUpdater::populate_ordered_component_label(Time_root& tr
     return tr.ordered_component_label;
 }
 
+// convert std::set<int> to a string
 std::string PersistenceUpdater::int_set_to_string(std::set<int> comp_label)
 {
     std::stringstream ss;
@@ -252,7 +255,7 @@ std::string PersistenceUpdater::int_set_to_string(std::set<int> comp_label)
 }
 
 
-
+// compute dendrogram template using naive algorithm
 Time_root PersistenceUpdater::compute_dendrogram_template(zeta_seq& zs)
 {
     boost::unordered::unordered_map<double, double_bigrade> appearance_to_bigrade; // map from time of appearance to point in zeta seq
@@ -510,10 +513,10 @@ void PersistenceUpdater::relabel_dendrogram_with_oracle(Time_root& tr)
 void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress)
 {
     // get underlying buffer
-    //std::streambuf* orig_buf = std::cout.rdbuf();
+    std::streambuf* orig_buf = std::cout.rdbuf();
 
     // set null
-    //std::cout.rdbuf(NULL);
+    std::cout.rdbuf(NULL);
 
     // PART 1: INITIAL CELL COMPUTATION
     debug() << "PART 1: INITIAL CELL COMPUTATION";
@@ -1202,9 +1205,10 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
     }
 
     // restore buffer
-    //std::cout.rdbuf(orig_buf);
+    std::cout.rdbuf(orig_buf);
 }
 
+// true iff template_tr and dendrogram corresponding to next_zs formed by naive algorithm are isomorphic
 bool PersistenceUpdater::compare_template_to_naive_dendrogram(zeta_seq next_zs,
                                                              Time_root& template_tr)
 {

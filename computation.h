@@ -97,7 +97,7 @@ private:
     const int verbosity;
 
     std::unique_ptr<ComputationResult> compute_raw(ComputationInput& input);
-    std::unique_ptr<ComputationResult> dendrogram_compute_raw(ComputationInput& input);
+    std::unique_ptr<ComputationResult> dendrogram_compute_raw(ComputationInput& input); // used to test dendrograms without barcodes
 
 
 };

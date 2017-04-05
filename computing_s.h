@@ -17,6 +17,7 @@ namespace std
     };
 }
 
+// class used to compute S = T_0 \cup T_1 (section 4 of paper)
 class computing_s
 {
 private:
@@ -27,8 +28,8 @@ public:
     //Subset UF[]; // is reset at each new column; UF[x_0][v] is the instance of v in column x = x_0
     // 1-critical version SimplexTree* bifiltration;
     BifiltrationData* bifiltration;
-    std::unordered_set<std::pair<int,int>> T_0;
-    std::unordered_set<std::pair<int,int>> T_1;
+    std::unordered_set<std::pair<int,int>> T_0; // every bigrade where a 0-simplex is born
+    std::unordered_set<std::pair<int,int>> T_1; // Supp(xi_1) I think
     int m_x; //largest x-coordinate of bifiltration
     int m_y; //largest_y-coordinate of bifiltration
     std::vector<exact> x_grades;
@@ -36,10 +37,10 @@ public:
     //int V; //number of 0-simplices in bifiltration
     boost::unordered::unordered_map<int, std::unordered_set<unsigned>>  MSF_vertices; //called Q in paper
     boost::unordered::unordered_map<int, std::vector<std::pair<unsigned,unsigned>>> MSF_edges; //called Q in paper
-    boost::unordered::unordered_map<std::pair<int,int>, std::unordered_set<unsigned>> bigrade_to_vertices;
-    boost::unordered::unordered_map<std::pair<int,int>, std::unordered_set<std::pair<unsigned,unsigned>>> bigrade_to_edges;
-    std::unordered_set<int> x_coordinates;
-    std::unordered_set<int> y_coordinates;
+    boost::unordered::unordered_map<std::pair<int,int>, std::unordered_set<unsigned>> bigrade_to_vertices; // map from a bigrade to the 0-simplices born there
+    boost::unordered::unordered_map<std::pair<int,int>, std::unordered_set<std::pair<unsigned,unsigned>>> bigrade_to_edges; // map from a bigrade to the 1-simplices born there
+    std::unordered_set<int> x_coordinates; // set of all x such that there exists a bigrade of the form (x,_) in the bifiltration
+    std::unordered_set<int> y_coordinates; // set of all y such that there exists a bigrade of the form (_,y) in the bifiltration
 
     computing_s(/*SimplexTree* bif*/BifiltrationData* bif, int max_x, int max_y, std::vector<exact> x_exact, std::vector<exact> y_exact) :
         bifiltration(bif),
@@ -128,6 +129,7 @@ public:
         }
     }//end store_support_points()
 
+    // various functions for printing data structures and testing
     void print_T_0()
     {
         std::cout << "T_0:" << std::endl;
@@ -167,6 +169,7 @@ public:
         }
     }
 
+    // main function to compute S
     void compute_s()
     {
         // handle column x = 0

@@ -62,10 +62,13 @@ public:
     void store_barcodes_with_reset(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress); //hybrid approach -- for expensive crossings, resets the matrices and does a standard persistence calculation
     void store_barcodes_quicksort(std::vector<std::shared_ptr<Halfedge>>& path); ///TODO -- for expensive crossings, rearranges columns via quicksort and fixes the RU-decomposition globally
 
+    // convenient frequently used types
     typedef std::vector<std::shared_ptr<TemplatePointsMatrixEntry>> zeta_seq;
     typedef std::pair<std::pair<unsigned,unsigned>,int> bigrade_root;
     typedef std::pair<unsigned,unsigned> bigrade;
+    typedef std::pair<double,double> double_bigrade;
 
+    // various functions for printing data structures for testing
     void print_zeta_seq(zeta_seq& zs);
 
     void print_iterator(std::vector<std::shared_ptr<TemplatePointsMatrixEntry>>::iterator it);
@@ -80,22 +83,21 @@ public:
 
     void recursively_print_T_cur(Time_root& T_cur);
 
+    // comparator used to locate query elements in a zeta_seq
     static bool zsComparator(const std::shared_ptr<TemplatePointsMatrixEntry> e,
                              const std::shared_ptr<TemplatePointsMatrixEntry> f);
 
     /*static bool bigradeComparator(const std::pair<double,double> b1,
                                   const std::pair<double,double> b2);*/
 
+    // comparator for double_bigrade
     bool bigrade_geq(const std::pair<double,double> b1,
                      const std::pair<double,double> b2)
     {
         return (b1.first >= b2.first && b1.second >= b2.second);
     }
 
-    typedef std::pair<double,double> double_bigrade;
-
-    //template <class ForwardIterator>
-    //ForwardIterator bigrade_lower_bound (ForwardIterator first, ForwardIterator last, const double_bigrade& val)
+    // version of lower_bound used to locate a the first bigrade in a zeta_seq that is >= a query bigrade
     std::vector<double_bigrade>::iterator bigrade_lower_bound(std::vector<double_bigrade>::iterator first,
                                                               std::vector<double_bigrade>::iterator last,
                                                               const double_bigrade& val)
@@ -128,16 +130,16 @@ public:
 
     }
 
-    void draw_dendrogram(boost::unordered::unordered_map<std::pair<double,int>, Time_root>& time_root_to_tr,
-                                             Time_root& last_upper_tr);
+    /*void draw_dendrogram(boost::unordered::unordered_map<std::pair<double,int>, Time_root>& time_root_to_tr,
+                                             Time_root& last_upper_tr);*/
 
     // functions for testing templates vs. naive algorithm
-    std::string int_set_to_string(std::set<int> comp_label);
-    std::set<int> populate_ordered_component_label(Time_root& tr);
-    bool is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2);
-    Time_root compute_dendrogram_template(zeta_seq& zs);
-    void relabel_dendrogram_with_oracle(Time_root& tr);
-    bool compare_template_to_naive_dendrogram(zeta_seq next_zs, Time_root& template_tr);
+    std::string int_set_to_string(std::set<int> comp_label); // convert std::set<int> to a string
+    std::set<int> populate_ordered_component_label(Time_root& tr); // populate the component_label field of a dendrogram rooted at tr
+    bool is_dendrogram_isomorphic(Time_root& tr1, Time_root& tr2); // true iff dendrograms rooted at tr1 and tr2 are isomorphic
+    Time_root compute_dendrogram_template(zeta_seq& zs); // compute dendrogram template using naive algorithm
+    void relabel_dendrogram_with_oracle(Time_root& tr); // modify r field of dendrogram rooted at tr to correspond to the oracle
+    bool compare_template_to_naive_dendrogram(zeta_seq next_zs, Time_root& template_tr); // true iff template_tr and dendrogram corresponding to next_zs formed by naive algorithm are isomorphic
 
     //functions to compute and store dendrogram templates in each 2-cell of the arrangement
     void store_dendrogram_templates(std::vector<std::shared_ptr<Halfedge>>& path, Progress& progress);

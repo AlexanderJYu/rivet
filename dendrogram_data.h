@@ -88,6 +88,8 @@ public:
         }
     }
 
+    // various functions for printing data structures and testing
+
     static void print_upper_roots(std::unordered_set<int> upper_roots)
     {
         std::stringstream ss;
@@ -139,9 +141,9 @@ public:
                       << vertex_bigrade[v].first << " , " << vertex_bigrade[v].second << "))"
                       << std::endl;
         }
-        // insert dummy edge with inifinite weight at the end to update last wave new_heads
-        // MAGIC NUMBER
+        // insert dummy edge with inifinite weight at the end to update last wave of new_heads
         //graph->insert( EdgePtr( new Edge( 0, 0, std::numeric_limits<double>::infinity() ) ) );
+
         // Sort edges in non-decreasing order of their weight
         std::vector<EdgePtr> edges;
         graph->edges( edges );
@@ -159,16 +161,16 @@ public:
                       << std::endl;
         }
 
-        double current_time = edges.front()->wt;
+        double current_time = edges.front()->wt; // the current level of the dendrogram we are computing
         //std::pair<double,double> current_bigrade = edges.front()->bigrade;
-        std::pair<double,double> current_bigrade = appearance_to_bigrade[current_time];
-        std::unordered_set<int> new_heads;
-        std::vector<EdgePtr> new_edges;
-        std::vector<int> lower_roots;
-        std::unordered_set<int> upper_roots;
+        std::pair<double,double> current_bigrade = appearance_to_bigrade[current_time]; // the bigrade corresponding to current_time
+        std::unordered_set<int> new_heads; // the new nodes that will be added to the level of the dendrogram we are computing
+        std::vector<EdgePtr> new_edges; // the set of edges that that must be taken into account in the UF structure for the level of the dendrogram we are computing
+        std::vector<int> lower_roots; // the set of roots (r field in time_root) which become the lower root during a call to union
+        std::unordered_set<int> upper_roots; // the set of roots (r field in time_root) which become the upper root during a call to union
         //boost::unordered::unordered_map<int, std::vector<int>> new_head_to_children;
         //boost::unordered::unordered_map<int, Time_root> V_to_prev_tr; // maps a 0-simplex v to the last time root that represents v's component
-        boost::unordered::unordered_map<int, std::shared_ptr<std::pair<double,int>>> V_to_prev_tr;
+        boost::unordered::unordered_map<int, std::shared_ptr<std::pair<double,int>>> V_to_prev_tr; // maps a 0-simplex to the last pair (time,root) corresponding to the time_root that contains v
 
 
         //std::vector<int> all_roots_at_next_time; // keep track of all time roots formed at next_time for num_leaves updating
@@ -199,6 +201,8 @@ public:
                 //std::cout << "edges_has_one_more = " << edges_has_one_more << std::endl;
             }
 
+            // Every time edgePtr->wt > current_time corresponds to moving from one level of a dendrogram to the next.
+            // When this happens, we do all the necessary changes to complete the construction of the current level of the dendrogram.
             if (edgePtr->wt > current_time)
             {
                 std::cout << "wt > current_time" << std::endl;
@@ -373,6 +377,7 @@ public:
                 }
 
                 std::cout << "update V_to_prev_tr for V_that_have_become_children" << std::endl;
+                // update V_to_prev_tr for V_that_have_become_children
                 for (int x : V_that_have_become_children)
                 {
                     std::cout << "x = " << x << std::endl;
@@ -426,9 +431,9 @@ public:
                           << edgePtr->w << " "
                           << edgePtr->wt << std::endl;*/
 
+                // if edgePtr->wt = infinty then we are analyzing the last edge so we update upper_trs
                 if (edgePtr->wt == std::numeric_limits<double>::infinity())
                 {
-                    //std::cout << "inside loop" << std::endl;
                     for (int v : upper_roots)
                     {
                         std::cout << "v = " << v << std::endl;
@@ -444,7 +449,7 @@ public:
                 }
                 std::cout << "done updating upper_trs" << std::endl;
 
-
+                // done analyzing last edge so we return
                 if (edgePtr->wt == std::numeric_limits<double>::infinity())
                 {
                     std::cout << "about to return from compute_dendrogram" << std::endl;
@@ -452,6 +457,7 @@ public:
                 }
 
                 std::cout << "start resetting" << std::endl;
+                // reset all the necessary data structures
                 new_edges.clear();
                 new_heads.clear();
                 lower_roots.clear();
@@ -481,6 +487,8 @@ public:
                 // current_heads = new_heads;
                 //continue;
             }
+
+            // perform the necessary UF operations for kruskal's algorithm
             if (edgePtr->v == edgePtr->w)
             {
                 //std::cout << "edgePtr->v == edgePtr->w" << std::endl;

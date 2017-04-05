@@ -34,15 +34,15 @@ class Time_root
 public:
     double t; // 1-dim filtration parameter
     int r; //0-simplex label (representative from UF)
-    int num_children; //I forget what this is for (probably graphics)
+    int num_children; // I believe num_leaves replaced the function of num_children (used for drawing dendrograms in a planar fashion)
     int num_leaves; //number of descendants that are leaves
     std::vector<std::shared_ptr<Time_root>> children;
     //std::vector<int> comp_vertices;
     std::unordered_set<int> birth_label;
-    std::string birth_label_str;
+    std::string birth_label_str; // string version of birth_label
     std::pair<unsigned,unsigned> bigrade; //2-dim filtration paramter (possibly should combine t and bigrade into one parameter)
     std::unordered_set<int> component_label;
-    std::set<int> ordered_component_label;
+    std::set<int> ordered_component_label; // sorted version of component_label (used for comparing templates to naive algorithm)
     Time_root(double t = -1, int r = -1, int num_children = 0, int num_leaves = 0) :
         t(t), r(r), num_children(num_children), num_leaves(num_leaves) { }
 
@@ -51,6 +51,8 @@ public:
     {
         ar& t& r& num_leaves& children& birth_label_str& bigrade;
     }
+
+    // various functions for printing data structures and testing
 
     static void print_tr(Time_root& tr, bool with_comp_label = false)
     {
@@ -112,9 +114,6 @@ public:
         }
         return ss.str();
     }
-
-
-
 
     static void print_trs(std::vector<Time_root>& trs, bool with_comp_label = false)
     {
