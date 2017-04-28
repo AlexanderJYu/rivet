@@ -147,18 +147,3 @@ FORMS   += visualizationwindow.ui			\
     interface/progressdialog.ui \
     interface/aboutmessagebox.ui \
     interface/configuredialog.ui
-
-# QMAKE_MAC_SDK = macosx10.12
-
-CONFIG += c++11
-QMAKE_CFLAGS += -std=c++11 -stdlib=libc++ -mmacosx-version-min=10.8
-QMAKE_CXXFLAGS += -std=c++11 -stdlib=libc++ -mmacosx-version-min=10.8
-
-QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.9
-
-
-LIBS += -L"/usr/local/Cellar/boost/1.60.0_2/lib"
-INCLUDEPATH += "/usr/local/Cellar/boost/1.60.0_2/include"
-LIBS += -L"/usr/local/Cellar/boost/1.60.0_2/lib" -lboost_random
-
-INCLUDEPATH += "../qt4/QtCore"
