@@ -118,9 +118,9 @@ public:
     //stores the S support points in lexicographical order
     void store_S_points(std::vector<TemplatePoint>& tpts)
     {
-        for(unsigned i = 0; i < m_x; i++)
+        for(int i = 0; i < m_x; i++)
         {
-            for(unsigned j = 0; j < m_y; j++)
+            for(int j = 0; j < m_y; j++)
             {
                 std::pair<int,int> current (i,j);
                 if (T_0.find(current) != T_0.end() || T_1.find(current) != T_1.end())
@@ -175,7 +175,7 @@ public:
         // handle column x = 0
         // Allocate memory for creating V ssubsets
         std::map<int, Subset_map> UF;
-        std::unordered_set<unsigned> unique_vertices;
+        std::unordered_set<unsigned> unique_vertices; // keep track of vertices currently in the UF structure
 
         for (int y = 0; y <= m_y; y++)
         {
@@ -231,7 +231,7 @@ public:
                 oracle[g] = UF;
             }
         }
-        std::cout << "got past first column" << std::endl;
+        //std::cout << "got past first column" << std::endl;
         // handle columns 1 <= x <= m_x
         for (int x = 1; x <= m_x; x++)
         {
@@ -248,7 +248,7 @@ public:
 
                 // step 2
                 std::cout << "====== STEP 2 ======" << std::endl;
-                bool vertex_identified = false; // a condition for g being in T_1
+                bool vertex_identified = false; // one of the conditions for g being in T_1
                 std::cout << "MSF_vertices[y].size() = " << MSF_vertices[y].size() << std::endl;
                 std::vector<unsigned> verts_to_erase;
                 for (unsigned v : MSF_vertices[y])

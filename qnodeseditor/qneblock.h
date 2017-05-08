@@ -38,7 +38,7 @@ public:
 
     QNEBlock(QGraphicsItem *parent = 0, double block_x_scale = 1, double block_y_scale = -1, ConfigParameters *params = 0);
 
-    QNEPort* addPort(const QString &name, bool isOutput, bool shouldResize = false, int flags = 0, int ptr = 0);
+    QNEPort* addPort(const QString &name, bool isOutput, /*bool shouldResize = false,*/ int flags = 0, int ptr = 0);
 	void addInputPort(const QString &name);
 	void addOutputPort(const QString &name);
 	void addInputPorts(const QStringList &names);

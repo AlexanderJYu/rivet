@@ -61,9 +61,9 @@ VisualizationWindow::VisualizationWindow(InputParameters& params)
     , slice_diagram(&config_params, grades.x, grades.y, this)
     , slice_update_lock(false)
     , p_diagram(&config_params, this)
-    , persistence_diagram_drawn(false)
-    , dendrogram_diagram(NULL,&config_params,this)
+    , dendrogram_diagram(/*NULL,*/&config_params,this)
     , dendrogram_arrangement_received(false)
+    , persistence_diagram_drawn(false)
 {
     ui->setupUi(this);
 

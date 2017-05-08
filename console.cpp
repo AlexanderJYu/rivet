@@ -170,6 +170,62 @@ void process_bounds(const ComputationResult &computation_result) {
     std::cout << "high: " << x_high << ", " << y_high << std::endl;
 }
 
+double project(TemplatePoint& pt, double angle, double offset, Grades& grades)
+{
+    if(angle == 0)  //then line is horizontal
+    {
+        if( grades.y[pt.y] <= offset)   //then point is below the line, so projection exists
+            return grades.x[pt.x];
+        else    //then no projection
+            return INFTY;
+    }
+    else if(angle == 90)    //then line is vertical
+    {
+        if( grades.x[pt.x] <= -1*offset)   //then point is left of the line, so projection exists
+            return grades.y[pt.y];
+        else    //then no projection
+            return INFTY;
+    }
+    //if we get here, then line is neither horizontal nor vertical
+    double radians = angle*PI/180;
+    double x = grades.x[pt.x];
+    double y = grades.y[pt.y];
+
+    if( y > x*tan(radians) + offset/cos(radians) )  //then point is above line
+        return y/sin(radians) - offset/tan(radians); //project right
+
+    return x/cos(radians) + offset*tan(radians); //project up
+}
+
+enum {is_forest_connector = -2}; // MAGIC NUMBER
+
+void project_template_dendrogram(Time_root& tr, Grades& grades, double angle_precise, double offset_precise)
+{
+    int x,y;
+    if (tr.r == is_forest_connector)
+    {
+        x = 0;
+        y = 0;
+    }
+    else
+    {
+        x = tr.bigrade.first;
+        y = tr.bigrade.second;
+    }
+    TemplatePoint pt(x,y,0,0,0);
+    tr.t = project(pt, angle_precise, offset_precise, grades);
+    std::vector<std::shared_ptr<Time_root>> new_children;
+    for (auto child : tr.children)
+    {
+        Time_root new_child = *child;
+        std::shared_ptr<Time_root> new_child_ptr = std::make_shared<Time_root>(new_child);
+        project_template_dendrogram(*new_child_ptr, grades, angle_precise, offset_precise);
+        new_children.push_back(new_child_ptr);
+    }
+    tr.children = new_children;
+    return;
+}
+
 void process_barcode_queries(std::string query_file_name, const ComputationResult& computation_result)
 {
     std::ifstream query_file(query_file_name);
@@ -209,6 +265,7 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
     }
     Grades grades(computation_result.arrangement->x_exact, computation_result.arrangement->y_exact);
     auto den_arr = computation_result.dendrogram_arrangement;
+    Grades den_grades(den_arr->x_exact, den_arr->y_exact);
     for (auto query : queries) {
         auto angle = query.first;
         auto offset = query.second;
@@ -233,6 +290,10 @@ void process_barcode_queries(std::string query_file_name, const ComputationResul
         name << "../../../" << query.first << "_" << query.second << ".dot";
         Dendrogram_viz::write_dendrogram_dot_file(dendro, name.str(), den_arr->get_x_grades(), den_arr->get_y_grades());
         std::cout << "write_dendrogram_dot_file complete" << std::endl;
+
+        Time_root projected_dendro = dendro;
+        project_template_dendrogram(projected_dendro, den_grades, angle, offset);
+        Time_root::print_formatted_dendrogram(projected_dendro);
 
         for (auto it = barcode->begin(); it != barcode->end(); it++) {
             auto bar = *it;

@@ -7,6 +7,8 @@
 #include <sstream>
 #include <string>
 #include <set>
+#include <boost/unordered_map.hpp>
+
 
 namespace std
 {
@@ -137,41 +139,93 @@ public:
         }
     }
 
-    /*
-    static void print_vector_of_tr(std::vector<Time_root> children)
+    enum {is_forest_connector = -2};
+
+    static void print_formatted_dendrogram(Time_root& tr)
     {
-        for(Time_root child : children)
+        //boost::unordered::unordered_map<int, Time_root> tr_array;
+        boost::unordered::unordered_map<std::pair<double, int>, int> t_r_to_idx;
+        std::map<int, std::string> idx_to_outputline;
+        std::shared_ptr<int> n = std::make_shared<int>(0);
+        boost::unordered::unordered_map<std::pair<double, int>, int> t_r_to_numDes;
+        std::vector<int> roots_idxs;
+        compute_numDescendants(tr, t_r_to_numDes);
+
+        if (tr.r != is_forest_connector)
+            compute_outputlines(tr, t_r_to_idx, idx_to_outputline, t_r_to_numDes, roots_idxs, true, n);
+        else
         {
-            std::cout << "child.t = " << child.t << " , "
-                      << "child.r = " << child.r << " , "
-                      << "child.num_children = " << child.num_children << std::endl;
+            for (auto child_ptr : tr.children)
+                compute_outputlines(tr, t_r_to_idx, idx_to_outputline, t_r_to_numDes, roots_idxs, true, n);
         }
-    }*/
-    /*
-    static void print_vector_of_comp(std::vector<int> comp_vertices)
+
+        std::stringstream ss_roots;
+        for (int x : roots_idxs)
+            ss_roots << x << ",";
+        std::string str_roots = ss_roots.str();
+        std::cout << "numVertices = " << *n + 1 << std::endl;
+        std::cout << "rootsOfTrees = " << str_roots.substr(0, str_roots.size()-1) << std::endl;
+        for (int i = 0; i <= *n; i++)
+        {
+            std::cout << idx_to_outputline[i] << std::endl;
+        }
+    }
+
+    static int compute_numDescendants(Time_root& tr,
+                                      boost::unordered::unordered_map<std::pair<double, int>, int>& t_r_to_numDes)
     {
+        int current_numDes = 0;
+        current_numDes += tr.birth_label.size();
+        for (auto child_ptr : tr.children)
+        {
+            current_numDes += compute_numDescendants(*child_ptr, t_r_to_numDes);
+        }
+        t_r_to_numDes[std::pair<double,int>(tr.t,tr.r)] = current_numDes;
+        return current_numDes;
+    }
+
+    static void compute_outputlines(Time_root& tr,
+                                    boost::unordered::unordered_map<std::pair<double, int>, int>& t_r_to_idx,
+                                    std::map<int, std::string>& idx_to_outputline,
+                                    boost::unordered::unordered_map<std::pair<double, int>, int>& t_r_to_numDes,
+                                    std::vector<int>& roots_idxs,
+                                    bool is_root,
+                                    std::shared_ptr<int> n)
+    {
+        int current_idx = *n;
+        //tr_array[current_idx] = tr;
+        t_r_to_idx[std::pair<double,int>(tr.t,tr.r)] = current_idx;
+        if (is_root)
+            roots_idxs.push_back(current_idx);
+        *n = *n + 1;
+        for (auto child_ptr : tr.children)
+        {
+            compute_outputlines(*child_ptr, t_r_to_idx, idx_to_outputline, t_r_to_numDes, roots_idxs, false, n);
+        }
         std::stringstream ss;
-        ss.str("");
-        for (int v : comp_vertices)
+        ss << tr.t << ";";
+        std::string bl = tr.birth_label_str;
+        ss << bl.substr(0, bl.size()-1) << ";";
+        if (tr.children.size() > 0)
         {
-            ss << v << ",";
+            std::stringstream ss_children;
+            for (auto child_ptr : tr.children)
+            {
+                Time_root& c = *child_ptr;
+                int c_idx = t_r_to_idx[std::pair<double,int>(c.t,c.r)];
+                ss_children << c_idx << ",";
+            }
+            std::string children_str = ss_children.str().substr(0,ss_children.str().size()-1);
+            ss << children_str << ";";
+            ss << tr.num_leaves << ";";
         }
-        std::cout << "comp_vertices = " << ss.str() << std::endl;
-    }*/
-    /*
-    static void print_map(std::unordered_map<std::pair<int,int>, Time_root> time_root_to_tr)
-    {
-        for(auto kv : time_root_to_tr)
+        else
         {
-            std::cout << "time = " << kv.first.first << " , "
-                      << "root = " << kv.first.second << " , "
-                      << "num_children = " << kv.second.num_children << " , "
-                      << "children = " << std::endl;
-            print_vector_of_tr(kv.second.children);
-            print_vector_of_comp(kv.second.comp_vertices);
-            std::cout << "###################################" << std::endl;
+            ss << ";1;";
         }
-    }*/
+        ss << t_r_to_numDes[std::pair<double,int>(tr.t,tr.r)] << ";";
+        idx_to_outputline[current_idx] = ss.str();
+    }
 };
 
 #endif // TIME_ROOT_H

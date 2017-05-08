@@ -455,7 +455,7 @@ Time_root PersistenceUpdater::compute_dendrogram_template(zeta_seq& zs)
     //debug() << "START compute dendrogram template";
     std::vector<Time_root> upper_trs;
     Time_root tr;
-    Dendrogram_data::compute_dendrogram(graph, mst, time_root_to_tr, tr, vertex_appearance, vertex_bigrade, appearance_to_bigrade, upper_trs);
+    Dendrogram_data::compute_dendrogram(graph, mst, time_root_to_tr, /*tr,*/ vertex_appearance, vertex_bigrade, appearance_to_bigrade, upper_trs);
     /*debug() << "upper_trs: ";
     Time_root::print_trs(upper_trs, true);
     for ( std::vector<EdgePtr>::const_iterator it = mst.begin(); it != mst.end(); ++it )
@@ -861,12 +861,13 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
         std::cout << ">>>>>>>>>>>> U = " << std::endl;
         Time_root::print_trs(U, true);
 
+        /*
         if (it_i_minus_1_exists)
         {
             std::map<int, Subset_map>& oracle_i_minus_1 = oracle[get_bigrade(*it_i_minus_1)]; // H[z_i'] in paper
             std::cout << "oracle_i_minus_1:" << std::endl;
             print_oracle_image(oracle_i_minus_1);
-        }
+        }*/
 
         // determine vertex representative of T_cur depending on whether it_i_plus_1 exists or not
         int T_cur_root;
@@ -1047,12 +1048,13 @@ void PersistenceUpdater::store_dendrogram_templates(std::vector<std::shared_ptr<
         std::cout << "step 6 begin" << std::endl;
         std::cout << "========================= next_zs:";
         print_zeta_seq(next_zs);
-        if (it_i_minus_1_exists)
+
+        /*if (it_i_minus_1_exists)
         {
             std::map<int, Subset_map>& oracle_i_minus_1 = oracle[get_bigrade(*it_i_minus_1)]; // H[z_i'] in paper
             std::cout << "oracle_i_minus_1:" << std::endl;
             //print_oracle_image(oracle_i_minus_1);
-        }
+        }*/
         std::vector<bigrade> functor_bigrades;
 
         if (it_i_plus_1_exists)
@@ -1284,7 +1286,7 @@ void PersistenceUpdater::remove_redundant_nodes(
     }
 
     std::queue<std::shared_ptr<Time_root>> unhandled_children;
-    for (int i = 0; i < tr.children.size(); i++)
+    for (std::vector<std::shared_ptr<Time_root>>::size_type i = 0; i != tr.children.size(); i++)
         unhandled_children.push(tr.children[i]);
 
     while (!unhandled_children.empty())
@@ -1520,7 +1522,7 @@ void PersistenceUpdater::connect_levels(std::map<int, Subset_map>& oracle,
     for (auto& v_tr : T_next[big_1])
     {
         int v = v_tr.first;
-        Time_root& tr_1 = *v_tr.second;
+        //Time_root& tr_1 = *v_tr.second;
         int h_v = Find(oracle,v);
         Time_root& tr_2 = *T_next[big_2][h_v];
         tr_2.children.push_back(v_tr.second);
@@ -1805,7 +1807,7 @@ void PersistenceUpdater::store_initial_dendrogram_template(std::shared_ptr<Face>
 
     debug() << "START store_initial_dendrogram_template";
     std::vector<Time_root> upper_trs;
-    Dendrogram_data::compute_dendrogram(graph, mst, time_root_to_tr, tr, vertex_appearance, vertex_bigrade, appearance_to_bigrade, upper_trs);
+    Dendrogram_data::compute_dendrogram(graph, mst, time_root_to_tr, /*tr,*/ vertex_appearance, vertex_bigrade, appearance_to_bigrade, upper_trs);
     debug() << "upper_trs: ";
     //Time_root::print_trs(upper_trs, true);
     for ( std::vector<EdgePtr>::const_iterator it = mst.begin(); it != mst.end(); ++it )
@@ -1834,15 +1836,14 @@ void PersistenceUpdater::store_initial_dendrogram_template(std::shared_ptr<Face>
         tr = upper_trs.front();
 
     debug() << "END store_initial_dendrogram_template";
-    for (auto t_big : appearance_to_bigrade)
+    /*for (auto t_big : appearance_to_bigrade)
     {
         auto t = t_big.first;
         auto big = t_big.second;
-        /*
         std::cout << "t = " << t << " , " << "big = ("
                   << big.first << "," << big.second << ")"
-                  << std::endl;*/
-    }
+                  << std::endl;
+    }*/
     return;
 
 }

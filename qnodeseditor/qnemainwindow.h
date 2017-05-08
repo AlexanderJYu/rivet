@@ -55,7 +55,7 @@ public:
                            ConfigParameters* params,
                            QObject *parent = 0);*/
 
-    explicit QNEMainWindow(const Time_root& tr,
+    explicit QNEMainWindow(/*const Time_root& tr,*/
                            ConfigParameters* params,
                            QObject *parent = 0);
 	~QNEMainWindow();
@@ -127,6 +127,7 @@ private:
     double block_x_scale, block_y_scale;   //x- and y- scales for drawing QNEblocks
     const int padding;  //distance between xi support point area and control rectangle (on the top and right sides)
     double data_xmin, data_xmax, data_ymin, data_ymax;  //min and max coordinates of the data
+    double finite_data_xmax; // the largest x coordinate that is not infinite
     int diagram_width, diagram_height;  //pixel size of the diagram
     double line_slope;   //slope of the slice line in data units
     bool line_vert;      //true if the line is vertical, false otherwise

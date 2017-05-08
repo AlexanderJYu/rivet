@@ -116,7 +116,7 @@ public:
     static void compute_dendrogram( DenseGRAPH<Edge>* graph,
                      std::vector<EdgePtr>& mst,
                      boost::unordered::unordered_map<std::pair<double,int>, Time_root>& time_root_to_tr,
-                     Time_root& last_upper_tr,
+                     /*Time_root& last_upper_tr,*/
                      boost::unordered::unordered_map<unsigned, double>& vertex_appearance,
                      boost::unordered::unordered_map<unsigned, std::pair<double,double>>& vertex_bigrade,
                      boost::unordered::unordered_map<double, std::pair<double,double>>& appearance_to_bigrade,

@@ -38,10 +38,10 @@ private:
 
 public:
     DenseGRAPH(int V, bool digraph = false) :
-        adj(V), 
         Vcnt(V), 
         Ecnt(0), 
-        digraph(digraph)
+        digraph(digraph),
+        adj(V)
     { 
         for ( int i = 0; i < V; i++ ) adj[i].resize( V );
     }
@@ -119,9 +119,10 @@ private:
 
 public:
     adjIterator(const DenseGRAPH<Edge> &G, int v) : 
-        G(G), 
-        v(v), 
-        i(0) {}
+        G(G),
+        i(0),
+        v(v) {}
+
 
     EdgePtr beg() { i = -1; return nxt(); }
 

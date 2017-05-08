@@ -65,7 +65,7 @@ QNEBlock::QNEBlock(QGraphicsItem *parent, double block_x_scale, double block_y_s
 
 }
 
-QNEPort* QNEBlock::addPort(const QString &name, bool isOutput, bool shouldResize, int flags, int ptr)
+QNEPort* QNEBlock::addPort(const QString &name, bool isOutput, /*bool shouldResize,*/ int flags, int ptr)
 {
     QNEPort *port = new QNEPort(this, block_x_scale, block_y_scale, config_params);
 	port->setName(name);
@@ -76,8 +76,8 @@ QNEPort* QNEBlock::addPort(const QString &name, bool isOutput, bool shouldResize
 
 
 	QFontMetrics fm(scene()->font());
-	int w = fm.width(name);
-	int h = fm.height();
+    //int w = fm.width(name);
+    //int h = fm.height();
 	// port->setPos(0, height + h/2);
     /*if (shouldResize && w > width - horzMargin)
         width = w + horzMargin;*/

@@ -87,8 +87,8 @@ void QNEConnection::updatePath()
 
 	p.moveTo(pos1);
 
-	qreal dx = pos2.x() - pos1.x();
-	qreal dy = pos2.y() - pos1.y();
+    //qreal dx = pos2.x() - pos1.x();
+    //qreal dy = pos2.y() - pos1.y();
 
     //QPointF ctr1(pos1.x() + dx * 0.25, pos1.y() + dy * 0.1);
     //QPointF ctr2(pos1.x() + dx * 0.75, pos1.y() + dy * 0.9);

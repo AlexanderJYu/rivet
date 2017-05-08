@@ -74,6 +74,7 @@ void QNEMainWindow::draw_dendrogram(QGraphicsScene* scene,
     for (std::shared_ptr<Time_root> child_ptr : current_tr.children)
     {
         Time_root& child = *child_ptr;
+
         //int num_children = child.num_children;
         //double block_x_scale = 5.0 / (graph->V());
         //double block_y_scale = (-5.0) / (graph->V());
@@ -97,81 +98,53 @@ void QNEMainWindow::draw_dendrogram(QGraphicsScene* scene,
         //top_of_partition += num_leaves * 100;
         bottom_of_partition += num_leaves * 100 * (-1 * block_y_scale);
 
-        QNEBlock *b = new QNEBlock(0, block_x_scale, block_y_scale, config_params);
-        scene->addItem(b);
-
-        std::stringstream ss;
-        ss << "(" << child.t << "," << child.r << ")";
-        QString in_str =  QString::fromStdString(ss.str());
-
-        // UNCOMMENT LATER handle component labels later
-        /*
-        ss.str("");
-        ss << "[";
-        for (int v : child.comp_vertices)
+        if (child.t != std::numeric_limits<double>::infinity())
         {
-            ss << v << ",";
+            QNEBlock *b = new QNEBlock(0, block_x_scale, block_y_scale, config_params);
+            scene->addItem(b);
+
+            std::stringstream ss;
+            ss << "(" << child.t << "," << child.r << ")";
+            QString in_str =  QString::fromStdString(ss.str());
+
+            std::stringstream ss_label;
+            ss_label << "[" << time_root_to_complabel[std::pair<double,int>(child.t, child.r)];
+            std::string complabel = ss_label.str();
+            complabel.erase(complabel.size() - 1);
+            complabel.append("]");
+
+            //xpos_to_cluster[child.t].append(complabel);
+            intervals.push_back(Interval<std::string,double>(child.t, current_tr.t, complabel));
+
+
+            //std::cout << "child.comp_vertices.size() = " << child.comp_vertices.size() << std::endl;
+            QString out_str = QString::fromStdString(child.birth_label_str);
+            QNEPort* in = (b->addPort(in_str,false/*,true*/));
+            QNEPort* out = (b->addPort(out_str,true));
+            out->setLabelVisibility(false);
+            in->setLabelVisibility(false);
+            b->setPos(xpos,ypos);
+            if (current_tr.r != is_forest_connector && current_tr.t != std::numeric_limits<double>::infinity())
+            {
+                conn = new QNEConnection(0);
+                scene->addItem(conn);
+
+                //QVector<QNEPort*> ports = vertex_blocks[v].ports();
+                //QGraphicsItem *item_v = itemAt(vertex_pos[v].first,vertex_pos[v].second);
+                conn->setPort1(out);
+                conn->setPort2(current_in);
+                conn->setPos1(out->scenePos());
+                conn->setPos2(current_in->scenePos());
+                conn->updatePath();
+            }
+            draw_dendrogram(scene, child, next_low_high, in, block_x_scale, block_y_scale, intervals);
+
         }
-        std::string ss_str = ss.str();
-        ss_str.erase(ss_str.size() - 1);
-        ss_str.append("]");
-        QString out_str = QString::fromStdString(ss_str);*/
-
-        //xpos_to_cluster[child.t].append(ss_str);
-        //std::string current_cluster = xpos_to_cluster[child.t];
-        //current_cluster.append(ss_str);
-        //xpos_to_cluster[child.t] = current_cluster;
-        //std::string complabel = time_root_to_complabel[std::pair<double,int>(child.t, child.r)];
-        std::stringstream ss_label;
-        ss_label << "[" << time_root_to_complabel[std::pair<double,int>(child.t, child.r)];
-        std::string complabel = ss_label.str();
-        complabel.erase(complabel.size() - 1);
-        complabel.append("]");
-
-        //xpos_to_cluster[child.t].append(complabel);
-        intervals.push_back(Interval<std::string,double>(child.t, current_tr.t, complabel));
-
-        /*
-        //std::cout << "child.t = " << child.t << " , " << "child.r = " << child.r << std::endl;
-        //std::cout << "out_str = " << ss_str << std::endl;
-        //std::cout << "xpos_to_cluster[" << child.t << "] = "
-                  << xpos_to_cluster[child.t] << std::endl;
-        //std::cout << "*^*^*^*^*^**^**^*^*^" << std::endl;
-        //std::cout << "xpos_to_cluster[0] = "
-                  << xpos_to_cluster[0] << std::endl;
-        //std::cout << "xpos_to_cluster[1] = "
-                  << xpos_to_cluster[1] << std::endl;
-        //std::cout << "xpos_to_cluster[2] = "
-                  << xpos_to_cluster[2] << std::endl;
-        //std::cout << "xpos_to_cluster[24] = "
-                  << xpos_to_cluster[24] << std::endl;*/
-
-
-        //std::cout << "child.comp_vertices.size() = " << child.comp_vertices.size() << std::endl;
-        QString out_str = QString::fromStdString(child.birth_label_str);
-        QNEPort* in = (b->addPort(in_str,false/*,true*/));
-        QNEPort* out = (b->addPort(out_str,true));
-        out->setLabelVisibility(false);
-        in->setLabelVisibility(false);
-        b->setPos(xpos,ypos);
-
-        //int v = it->get()->v;
-        //int w = it->get()->w;
-        if (current_tr.r != is_forest_connector)
+        else
         {
-            conn = new QNEConnection(0);
-            scene->addItem(conn);
-
-            //QVector<QNEPort*> ports = vertex_blocks[v].ports();
-            //QGraphicsItem *item_v = itemAt(vertex_pos[v].first,vertex_pos[v].second);
-            conn->setPort1(out);
-            conn->setPort2(current_in);
-            conn->setPos1(out->scenePos());
-            conn->setPos2(current_in->scenePos());
-            conn->updatePath();
+            QNEPort* in; // dummy variable to fulfill draw_dendrogram argument
+            draw_dendrogram(scene, child, next_low_high, in, block_x_scale, block_y_scale, intervals);
         }
-
-        draw_dendrogram(scene, child, next_low_high, in, block_x_scale, block_y_scale, intervals);
     }
 }
 
@@ -403,6 +376,8 @@ void QNEMainWindow::compute_data_parameters(const Time_root& tr,
                                             std::shared_ptr<int> n)
 {
     *n = *n + 1;
+    if (tr.t > finite_data_xmax && tr.t < std::numeric_limits<double>::infinity())
+        finite_data_xmax = tr.t;
     if (tr.t > data_xmax)
         data_xmax = tr.t;
     if (tr.t < data_xmin)
@@ -421,6 +396,7 @@ void QNEMainWindow::update_dendrogram(const Time_root& tr)
     std::shared_ptr<int> n = std::make_shared<int>(0);
     data_xmin = 0;
     data_xmax = 0;
+    finite_data_xmax = 0;
     compute_data_parameters(tr, n);
     intervals.clear();
 
@@ -428,6 +404,13 @@ void QNEMainWindow::update_dendrogram(const Time_root& tr)
     //std::cout << "data_xmin = " << data_xmin << std::endl;
     //std::cout << "data_xmax = " << data_xmax << std::endl;
     //std::cout << "n = " << *n << std::endl;
+
+    bool has_infinity_nodes = false;
+    if (data_xmax == std::numeric_limits<double>::infinity())
+        has_infinity_nodes = true;
+
+    if (has_infinity_nodes)
+        data_xmax = finite_data_xmax;
 
     block_x_scale = 3.0 / (data_xmax - data_xmin);
     block_y_scale = (-5.0) / ((double) *n);
@@ -473,7 +456,7 @@ void QNEMainWindow::update_dendrogram(const Time_root& tr)
     resize_diagram();
     update_window_controls();
 
-    if (tr.r != is_forest_connector)
+    if (tr.r != is_forest_connector && tr.t != std::numeric_limits<double>::infinity())
     {
         QNEBlock *b = new QNEBlock(0, block_x_scale, block_y_scale, config_params);
         this->addItem(b);
@@ -547,11 +530,11 @@ void QNEMainWindow::update_dendrogram(const Time_root& tr)
     interval_tree = IntervalTree<std::string, double>(intervals);
 }
 
-QNEMainWindow::QNEMainWindow(const Time_root& tr,
+QNEMainWindow::QNEMainWindow(/*const Time_root& tr,*/
                              ConfigParameters* params,
                              QObject *parent) :
-    QGraphicsScene(parent), dot_left(), dot_right(), slice_line(), padding(30), PI(3.14159265358979323846),
-    config_params(params), data_xmin(0), data_xmax(0), data_ymin(0), data_ymax(1000), time_root_to_complabel()
+    QGraphicsScene(parent), dot_left(), dot_right(), slice_line(), config_params(params), PI(3.14159265358979323846),
+    padding(30), data_xmin(0), data_xmax(0), data_ymin(0), data_ymax(1000), time_root_to_complabel()
 {
     // Add slice line to diagram
     /*Time_root nonconst_tr = tr;
